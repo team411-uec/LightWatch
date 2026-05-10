@@ -121,7 +121,7 @@ final class StatusBarController: NSObject {
         )
         let window = NSWindow(contentViewController: NSHostingController(rootView: view))
         window.title = "LightWatch設定"
-        window.setContentSize(NSSize(width: 620, height: 520))
+        window.setContentSize(NSSize(width: 560, height: 420))
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         window.delegate = self
@@ -154,50 +154,157 @@ private struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Form {
-                Section {
-                    TextField("Discord Webhook URL", text: $draft.discordWebhookURL)
-                    Picker("カメラ", selection: $draft.cameraUniqueID) {
-                        Text("システム既定").tag("")
-                        ForEach(cameraOptions) { camera in
-                            Text(camera.name).tag(camera.id)
-                        }
+        VStack(spacing: 0) {
+            TabView {
+                generalPane
+                    .tabItem {
+                        Label("一般", systemImage: "gearshape")
                     }
-                    HStack {
-                        Spacer()
-                        Button("カメラを再読み込み") {
-                            cameraOptions = CameraDeviceCatalog.availableOptions()
-                        }
+                detectionPane
+                    .tabItem {
+                        Label("判定", systemImage: "slider.horizontal.3")
                     }
-                }
-                Section {
-                    Toggle("ログイン時に起動", isOn: $draft.launchAtLogin)
-                    Stepper("取得間隔: \(Int(draft.captureIntervalSec))秒", value: $draft.captureIntervalSec, in: 1...30, step: 1)
-                    Stepper("短期比較: \(Int(draft.shortDiffSec))秒", value: $draft.shortDiffSec, in: 1...30, step: 1)
-                    Stepper("ノイズ計測: \(Int(draft.noiseWindowSec))秒", value: $draft.noiseWindowSec, in: 60...1800, step: 30)
-                    Stepper("ON確認: \(Int(draft.onConfirmSec))秒", value: $draft.onConfirmSec, in: 30...900, step: 5)
-                    Stepper("OFF確認: \(Int(draft.offConfirmSec))秒", value: $draft.offConfirmSec, in: 300...1800, step: 30)
-                    Stepper("クールダウン: \(Int(draft.cooldownSec))秒", value: $draft.cooldownSec, in: 60...1800, step: 30)
-                    Stepper("ON差分しきい値: \(Int(draft.minDeltaOn))", value: $draft.minDeltaOn, in: 1...80, step: 1)
-                    Stepper("OFF差分しきい値: \(Int(draft.minDeltaOff))", value: $draft.minDeltaOff, in: -80 ... -1, step: 1)
-                    Stepper("必要positive ROI数: \(draft.requiredPositiveROICount)", value: $draft.requiredPositiveROICount, in: 1...5)
-                    Stepper("ノイズ倍率: \(draft.noiseMultiplier, specifier: "%.1f")", value: $draft.noiseMultiplier, in: 1...10, step: 0.5)
-                }
             }
-            if let errorMessage {
-                Text(errorMessage)
-                    .foregroundStyle(.red)
-            }
-            HStack {
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Divider()
+
+            HStack(spacing: 12) {
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                }
                 Spacer()
                 Button("保存") {
                     save()
                 }
                 .keyboardShortcut(.defaultAction)
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
         }
-        .padding(20)
+    }
+
+    private var generalPane: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            settingRow("Webhook URL") {
+                TextField("", text: $draft.discordWebhookURL)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 360)
+            }
+
+            settingRow("カメラ") {
+                HStack(spacing: 8) {
+                    Picker("", selection: $draft.cameraUniqueID) {
+                        Text("システム既定").tag("")
+                        ForEach(cameraOptions) { camera in
+                            Text(camera.name).tag(camera.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 260)
+
+                    Button {
+                        cameraOptions = CameraDeviceCatalog.availableOptions()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .help("カメラ一覧を再読み込み")
+                }
+            }
+
+            Divider()
+                .padding(.vertical, 4)
+
+            Toggle("ログイン時に起動", isOn: $draft.launchAtLogin)
+                .toggleStyle(.checkbox)
+                .padding(.leading, 124)
+
+            Spacer()
+        }
+        .padding(24)
+    }
+
+    private var detectionPane: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            timeStepper("取得間隔", value: $draft.captureIntervalSec, range: 1...30, step: 1)
+            timeStepper("短期比較", value: $draft.shortDiffSec, range: 1...30, step: 1)
+            timeStepper("ノイズ計測", value: $draft.noiseWindowSec, range: 60...1800, step: 30)
+            timeStepper("ON確認", value: $draft.onConfirmSec, range: 30...900, step: 5)
+            timeStepper("OFF確認", value: $draft.offConfirmSec, range: 300...1800, step: 30)
+            timeStepper("クールダウン", value: $draft.cooldownSec, range: 60...1800, step: 30)
+
+            Divider()
+                .padding(.vertical, 4)
+
+            numberStepper("ON差分しきい値", value: $draft.minDeltaOn, range: 1...80, step: 1, digits: 0)
+            numberStepper("OFF差分しきい値", value: $draft.minDeltaOff, range: -80 ... -1, step: 1, digits: 0)
+            integerStepper("必要positive ROI数", value: $draft.requiredPositiveROICount, range: 1...5, step: 1)
+            numberStepper("ノイズ倍率", value: $draft.noiseMultiplier, range: 1...10, step: 0.5, digits: 1)
+
+            Spacer()
+        }
+        .padding(24)
+    }
+
+    private func settingRow<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            Text(title)
+                .frame(width: 108, alignment: .trailing)
+                .foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private func timeStepper(
+        _ title: String,
+        value: Binding<TimeInterval>,
+        range: ClosedRange<TimeInterval>,
+        step: TimeInterval
+    ) -> some View {
+        settingRow(title) {
+            Stepper(value: value, in: range, step: step) {
+                Text("\(Int(value.wrappedValue))秒")
+                    .monospacedDigit()
+                    .frame(width: 72, alignment: .leading)
+            }
+            .frame(width: 150, alignment: .leading)
+        }
+    }
+
+    private func numberStepper(
+        _ title: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>,
+        step: Double,
+        digits: Int
+    ) -> some View {
+        settingRow(title) {
+            Stepper(value: value, in: range, step: step) {
+                Text(value.wrappedValue.formatted(.number.precision(.fractionLength(digits))))
+                    .monospacedDigit()
+                    .frame(width: 72, alignment: .leading)
+            }
+            .frame(width: 150, alignment: .leading)
+        }
+    }
+
+    private func integerStepper(
+        _ title: String,
+        value: Binding<Int>,
+        range: ClosedRange<Int>,
+        step: Int
+    ) -> some View {
+        settingRow(title) {
+            Stepper(value: value, in: range, step: step) {
+                Text("\(value.wrappedValue)")
+                    .monospacedDigit()
+                    .frame(width: 72, alignment: .leading)
+            }
+            .frame(width: 150, alignment: .leading)
+        }
     }
 
     private func save() {
