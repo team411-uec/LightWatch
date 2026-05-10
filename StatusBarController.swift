@@ -126,9 +126,12 @@ final class StatusBarController: NSObject {
                 self?.onSettingsChanged?(updatedSettings)
             }
         )
+        let windowSize = NSSize(width: 700, height: 520)
         let window = NSWindow(contentViewController: NSHostingController(rootView: view))
         window.title = "LightWatch設定"
-        window.setContentSize(NSSize(width: 700, height: 540))
+        window.setContentSize(windowSize)
+        window.contentMinSize = windowSize
+        window.contentMaxSize = windowSize
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         window.delegate = self
@@ -188,12 +191,16 @@ private struct SettingsView: View {
             Group {
                 switch selectedTab {
                 case .general:
-                    generalPane
+                    ScrollView {
+                        generalPane
+                    }
                 case .detection:
-                    detectionPane
+                    ScrollView {
+                        detectionPane
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(width: 700, height: 390, alignment: .topLeading)
             .background(Color(nsColor: .controlBackgroundColor))
 
             Divider()
@@ -214,6 +221,7 @@ private struct SettingsView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
         }
+        .frame(width: 700, height: 520)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -259,8 +267,6 @@ private struct SettingsView: View {
                 .padding(.leading, 124)
             hintText("常駐させる場合は有効にします。")
                 .padding(.leading, 124)
-
-            Spacer()
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -289,8 +295,6 @@ private struct SettingsView: View {
                 .padding(.vertical, 4)
 
             referenceProfileRow
-
-            Spacer()
         }
         .padding(.horizontal, 24)
         .padding(.top, 16)
