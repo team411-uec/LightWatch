@@ -238,11 +238,11 @@ private struct SettingsView: View {
     private var detectionPane: some View {
         VStack(alignment: .leading, spacing: 10) {
             timeStepper("取得間隔", value: $draft.captureIntervalSec, range: 1...30, step: 1, hint: "短いほど反応は早く、ログ量は増えます。")
-            timeStepper("短期比較", value: $draft.shortDiffSec, range: 1...30, step: 1, hint: "何秒前の明るさと比べるかです。デバッグ時は短めにします。")
+            timeStepper("短期比較", value: $draft.shortDiffSec, range: 1...30, step: 1, hint: "何秒前の明るさと比べるかです。短いほど直近の変化を見ます。")
             timeStepper("ノイズ計測", value: $draft.noiseWindowSec, range: 60...1800, step: 30, hint: "通常の揺れ幅を測る時間です。短いほど環境変化に早く追従します。")
-            timeStepper("ON確認", value: $draft.onConfirmSec, range: 30...900, step: 5, hint: "点灯判定を確定するまでの継続時間です。デバッグ時は30秒にします。")
-            timeStepper("OFF確認", value: $draft.offConfirmSec, range: 300...1800, step: 30, hint: "消灯判定を確定するまでの継続時間です。本番は長めにします。")
-            timeStepper("クールダウン", value: $draft.cooldownSec, range: 60...1800, step: 30, hint: "通知後、次の通知を抑える時間です。デバッグ時は短めにします。")
+            timeStepper("ON確認", value: $draft.onConfirmSec, range: 30...900, step: 5, hint: "点灯判定を確定するまでの継続時間です。短いほど早く確定します。")
+            timeStepper("OFF確認", value: $draft.offConfirmSec, range: 300...1800, step: 30, hint: "消灯判定を確定するまでの継続時間です。長いほど誤検出を抑えます。")
+            timeStepper("クールダウン", value: $draft.cooldownSec, range: 60...1800, step: 30, hint: "通知後、次の通知を抑える時間です。短いほど再通知が早くなります。")
 
             Divider()
                 .padding(.vertical, 4)
