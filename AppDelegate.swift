@@ -19,8 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             settings = try settingsStore.load()
             logger = try EventLogger(applicationSupportDirectory: settingsStore.applicationSupportDirectory)
-            analyzer = LightAnalyzer(settings: settings)
-            stateMachine = StateMachine(settings: settings, initialState: settingsStore.loadState())
+            analyzer = LightAnalyzer(rois: settings.rois)
+            stateMachine = StateMachine(settings: settings, initialState: .dark)
             webhookClient = DiscordWebhookClient(settingsProvider: { [weak self] in
                 self?.settings ?? .default
             })
@@ -50,9 +50,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         cameraManager?.stop()
         stopPowerAssertion()
-        if let stateMachine {
-            settingsStore.saveState(stateMachine.currentState)
-        }
     }
 
     private func startCamera() {
@@ -77,7 +74,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let snapshot = try analyzer.analyze(sampleBuffer: sampleBuffer, state: stateMachine.currentState)
 
             let transitionEvents = stateMachine.handle(snapshot: snapshot)
-            settingsStore.saveState(stateMachine.currentState)
             DispatchQueue.main.async { [weak self] in
                 self?.statusBarController?.update(state: stateMachine.currentState)
             }
@@ -112,7 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings = updatedSettings
         settingsStore.save(settings)
         logWebhookConfigurationIfNeeded(updatedSettings)
-        analyzer = LightAnalyzer(settings: updatedSettings)
+        analyzer = LightAnalyzer(rois: updatedSettings.rois)
         stateMachine?.update(settings: updatedSettings)
         cameraManager?.update(
             captureInterval: updatedSettings.captureIntervalSec,

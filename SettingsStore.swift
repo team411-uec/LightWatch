@@ -5,7 +5,6 @@ final class SettingsStore {
     let logsDirectory: URL
 
     private let configURL: URL
-    private let stateURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -15,7 +14,6 @@ final class SettingsStore {
         applicationSupportDirectory = baseDirectory
         logsDirectory = baseDirectory.appendingPathComponent("logs", isDirectory: true)
         configURL = baseDirectory.appendingPathComponent("config.json")
-        stateURL = baseDirectory.appendingPathComponent("state.json")
     }
 
     func load() throws -> LightWatchSettings {
@@ -42,25 +40,6 @@ final class SettingsStore {
         }
     }
 
-    func loadState() -> LightWatchState {
-        guard FileManager.default.fileExists(atPath: stateURL.path),
-              let data = try? Data(contentsOf: stateURL),
-              let state = try? decoder.decode(LightWatchState.self, from: data) else {
-            return .dark
-        }
-        return state
-    }
-
-    func saveState(_ state: LightWatchState) {
-        do {
-            try ensureDirectories()
-            let data = try encoder.encode(state)
-            try data.write(to: stateURL, options: .atomic)
-        } catch {
-            NSLog("LightWatch状態保存に失敗しました: \(error.localizedDescription)")
-        }
-    }
-
     private func ensureDirectories() throws {
         try FileManager.default.createDirectory(at: applicationSupportDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: logsDirectory, withIntermediateDirectories: true)
@@ -72,7 +51,6 @@ struct LightWatchSettings: Codable, Equatable {
     var cameraUniqueID: String
     var launchAtLogin: Bool
     var captureIntervalSec: TimeInterval
-    var shortDiffSec: TimeInterval
     var onConfirmSec: TimeInterval
     var offConfirmSec: TimeInterval
     var minDeltaOn: Double
@@ -85,7 +63,6 @@ struct LightWatchSettings: Codable, Equatable {
         case cameraUniqueID
         case launchAtLogin
         case captureIntervalSec
-        case shortDiffSec
         case onConfirmSec
         case offConfirmSec
         case minDeltaOn
@@ -99,7 +76,6 @@ struct LightWatchSettings: Codable, Equatable {
         cameraUniqueID: String,
         launchAtLogin: Bool,
         captureIntervalSec: TimeInterval,
-        shortDiffSec: TimeInterval,
         onConfirmSec: TimeInterval,
         offConfirmSec: TimeInterval,
         minDeltaOn: Double,
@@ -111,7 +87,6 @@ struct LightWatchSettings: Codable, Equatable {
         self.cameraUniqueID = cameraUniqueID
         self.launchAtLogin = launchAtLogin
         self.captureIntervalSec = captureIntervalSec
-        self.shortDiffSec = shortDiffSec
         self.onConfirmSec = onConfirmSec
         self.offConfirmSec = offConfirmSec
         self.minDeltaOn = minDeltaOn
@@ -126,7 +101,6 @@ struct LightWatchSettings: Codable, Equatable {
         cameraUniqueID = try container.decodeIfPresent(String.self, forKey: .cameraUniqueID) ?? ""
         launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)
         captureIntervalSec = try container.decode(TimeInterval.self, forKey: .captureIntervalSec)
-        shortDiffSec = try container.decode(TimeInterval.self, forKey: .shortDiffSec)
         onConfirmSec = try container.decode(TimeInterval.self, forKey: .onConfirmSec)
         offConfirmSec = try container.decode(TimeInterval.self, forKey: .offConfirmSec)
         minDeltaOn = try container.decode(Double.self, forKey: .minDeltaOn)
@@ -140,7 +114,6 @@ struct LightWatchSettings: Codable, Equatable {
         cameraUniqueID: "",
         launchAtLogin: false,
         captureIntervalSec: 1,
-        shortDiffSec: 5,
         onConfirmSec: 45,
         offConfirmSec: 45,
         minDeltaOn: 18,

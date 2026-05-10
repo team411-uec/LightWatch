@@ -263,7 +263,6 @@ private struct SettingsView: View {
     private var detectionPane: some View {
         VStack(alignment: .leading, spacing: 10) {
             numberField("取得間隔", text: $numberFields.captureIntervalSec, suffix: "秒", hint: "短いほど反応は早く、ログ量は増えます。")
-            numberField("短期比較", text: $numberFields.shortDiffSec, suffix: "秒", hint: "何秒前の明るさと比べるかです。短いほど直近の変化を見ます。")
             numberField("ON確認", text: $numberFields.onConfirmSec, suffix: "秒", hint: "点灯判定を確定するまでの継続時間です。短いほど早く確定します。")
             numberField("OFF確認", text: $numberFields.offConfirmSec, suffix: "秒", hint: "消灯判定を確定するまでの継続時間です。長いほど誤検出を抑えます。")
 

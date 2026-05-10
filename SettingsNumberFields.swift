@@ -2,7 +2,6 @@ import Foundation
 
 struct SettingsNumberFields: Equatable {
     var captureIntervalSec: String
-    var shortDiffSec: String
     var onConfirmSec: String
     var offConfirmSec: String
     var minDeltaOn: String
@@ -11,7 +10,6 @@ struct SettingsNumberFields: Equatable {
 
     init(settings: LightWatchSettings) {
         captureIntervalSec = Self.integerString(settings.captureIntervalSec)
-        shortDiffSec = Self.integerString(settings.shortDiffSec)
         onConfirmSec = Self.integerString(settings.onConfirmSec)
         offConfirmSec = Self.integerString(settings.offConfirmSec)
         minDeltaOn = Self.integerString(settings.minDeltaOn)
@@ -21,7 +19,6 @@ struct SettingsNumberFields: Equatable {
 
     init(
         captureIntervalSec: Int,
-        shortDiffSec: Int,
         onConfirmSec: Int,
         offConfirmSec: Int,
         minDeltaOn: Int,
@@ -29,7 +26,6 @@ struct SettingsNumberFields: Equatable {
         requiredPositiveROICount: Int
     ) {
         self.captureIntervalSec = String(captureIntervalSec)
-        self.shortDiffSec = String(shortDiffSec)
         self.onConfirmSec = String(onConfirmSec)
         self.offConfirmSec = String(offConfirmSec)
         self.minDeltaOn = String(minDeltaOn)
@@ -40,7 +36,6 @@ struct SettingsNumberFields: Equatable {
     func applied(to settings: LightWatchSettings) throws -> LightWatchSettings {
         var updatedSettings = settings
         updatedSettings.captureIntervalSec = try validatedDouble(captureIntervalSec, name: "取得間隔", range: 1...30)
-        updatedSettings.shortDiffSec = try validatedDouble(shortDiffSec, name: "短期比較", range: 1...30)
         updatedSettings.onConfirmSec = try validatedDouble(onConfirmSec, name: "ON確認", range: 1...900)
         updatedSettings.offConfirmSec = try validatedDouble(offConfirmSec, name: "OFF確認", range: 1...1800)
         updatedSettings.minDeltaOn = try validatedDouble(minDeltaOn, name: "ON差分しきい値", range: 1...80)
