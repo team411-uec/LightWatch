@@ -122,6 +122,14 @@ final class LightAnalyzer {
         }
 
         let positiveStats = currentStats.filter { $0.kind == .positive }
+        if let globalSignal = makeGlobalOnSignal(
+            currentStats: currentStats,
+            positiveStats: positiveStats,
+            previous: previous
+        ) {
+            return globalSignal
+        }
+
         let changed = currentStats.filter { current in
             guard current.kind == .positive, let old = previous.stat(named: current.name) else {
                 return false
@@ -152,6 +160,14 @@ final class LightAnalyzer {
         }
 
         let positiveStats = currentStats.filter { $0.kind == .positive }
+        if let globalSignal = makeGlobalOffSignal(
+            currentStats: currentStats,
+            positiveStats: positiveStats,
+            previous: previous
+        ) {
+            return globalSignal
+        }
+
         let changed = currentStats.filter { current in
             guard current.kind == .positive, let old = previous.stat(named: current.name) else {
                 return false
@@ -167,6 +183,91 @@ final class LightAnalyzer {
         }
 
         return .changed(roiNames: changed.map(\.name), deltas: deltas(for: changed, from: previous, context: changeContext))
+    }
+
+    private func makeGlobalOnSignal(
+        currentStats: [ROIStats],
+        positiveStats: [ROIStats],
+        previous: LightAnalysisSnapshot
+    ) -> LightSignal? {
+        guard guardROIsChanged(
+            currentStats: currentStats,
+            previous: previous,
+            medianThreshold: settings.minDeltaOn / 2,
+            brightRatioThreshold: 0.015,
+            darkRatioThreshold: -0.015
+        ) else {
+            return nil
+        }
+        let changed = positiveStats.filter { current in
+            guard let old = previous.stat(named: current.name) else {
+                return false
+            }
+            return current.medianLuma - old.medianLuma >= settings.minDeltaOn
+                && current.brightRatio - old.brightRatio >= 0.03
+                && current.darkRatio - old.darkRatio <= -0.03
+        }
+        guard changed.count >= requiredPositiveROICount(availableCount: positiveStats.count) else {
+            return nil
+        }
+        return .changed(roiNames: changed.map(\.name), deltas: absoluteDeltas(for: changed, from: previous))
+    }
+
+    private func makeGlobalOffSignal(
+        currentStats: [ROIStats],
+        positiveStats: [ROIStats],
+        previous: LightAnalysisSnapshot
+    ) -> LightSignal? {
+        guard guardROIsChanged(
+            currentStats: currentStats,
+            previous: previous,
+            medianThreshold: settings.minDeltaOff / 2,
+            brightRatioThreshold: -0.015,
+            darkRatioThreshold: 0.015
+        ) else {
+            return nil
+        }
+        let changed = positiveStats.filter { current in
+            guard let old = previous.stat(named: current.name) else {
+                return false
+            }
+            return current.medianLuma - old.medianLuma <= settings.minDeltaOff
+                && current.brightRatio - old.brightRatio <= -0.03
+                && current.darkRatio - old.darkRatio >= 0.03
+        }
+        guard changed.count >= requiredPositiveROICount(availableCount: positiveStats.count) else {
+            return nil
+        }
+        return .changed(roiNames: changed.map(\.name), deltas: absoluteDeltas(for: changed, from: previous))
+    }
+
+    private func guardROIsChanged(
+        currentStats: [ROIStats],
+        previous: LightAnalysisSnapshot,
+        medianThreshold: Double,
+        brightRatioThreshold: Double,
+        darkRatioThreshold: Double
+    ) -> Bool {
+        let guardStats = currentStats.filter { $0.kind == .negative }
+        guard !guardStats.isEmpty else {
+            return false
+        }
+        return guardStats.allSatisfy { current in
+            guard let old = previous.stat(named: current.name) else {
+                return false
+            }
+            let medianDelta = current.medianLuma - old.medianLuma
+            let brightRatioDelta = current.brightRatio - old.brightRatio
+            let darkRatioDelta = current.darkRatio - old.darkRatio
+            if medianThreshold >= 0 {
+                return medianDelta >= medianThreshold
+                    && brightRatioDelta >= brightRatioThreshold
+                    && darkRatioDelta <= darkRatioThreshold
+            }
+            return medianDelta <= medianThreshold
+                && brightRatioDelta <= brightRatioThreshold
+                && darkRatioDelta >= darkRatioThreshold
+        }
     }
 
     private func snapshot(near date: Date) -> LightAnalysisSnapshot? {
@@ -185,6 +286,15 @@ final class LightAnalyzer {
                 return nil
             }
             return ("\(current.name)_relative_d5", context.change(current: current, old: old).relativeMedianDelta)
+        })
+    }
+
+    private func absoluteDeltas(for changedStats: [ROIStats], from previous: LightAnalysisSnapshot) -> [String: Double] {
+        Dictionary(uniqueKeysWithValues: changedStats.compactMap { current in
+            guard let old = previous.stat(named: current.name) else {
+                return nil
+            }
+            return ("\(current.name)_absolute_d5", current.medianLuma - old.medianLuma)
         })
     }
 
