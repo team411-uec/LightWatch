@@ -143,12 +143,14 @@ extension StatusBarController: NSWindowDelegate {
 
 private struct SettingsView: View {
     @State private var draft: LightWatchSettings
+    @State private var numberFields: SettingsNumberFields
     @State private var cameraOptions: [CameraDeviceOption]
     @State private var errorMessage: String?
     let onSave: (LightWatchSettings) -> Void
 
     init(settings: LightWatchSettings, onSave: @escaping (LightWatchSettings) -> Void) {
         _draft = State(initialValue: settings)
+        _numberFields = State(initialValue: SettingsNumberFields(settings: settings))
         _cameraOptions = State(initialValue: CameraDeviceCatalog.availableOptions())
         self.onSave = onSave
     }
@@ -227,7 +229,7 @@ private struct SettingsView: View {
             Toggle("ログイン時に起動", isOn: $draft.launchAtLogin)
                 .toggleStyle(.checkbox)
                 .padding(.leading, 124)
-            hintText("Mac miniで常駐させる場合は有効にします。")
+            hintText("常駐させる場合は有効にします。")
                 .padding(.leading, 124)
 
             Spacer()
@@ -237,20 +239,20 @@ private struct SettingsView: View {
 
     private var detectionPane: some View {
         VStack(alignment: .leading, spacing: 10) {
-            timeStepper("取得間隔", value: $draft.captureIntervalSec, range: 1...30, step: 1, hint: "短いほど反応は早く、ログ量は増えます。")
-            timeStepper("短期比較", value: $draft.shortDiffSec, range: 1...30, step: 1, hint: "何秒前の明るさと比べるかです。短いほど直近の変化を見ます。")
-            timeStepper("ノイズ計測", value: $draft.noiseWindowSec, range: 60...1800, step: 30, hint: "通常の揺れ幅を測る時間です。短いほど環境変化に早く追従します。")
-            timeStepper("ON確認", value: $draft.onConfirmSec, range: 30...900, step: 5, hint: "点灯判定を確定するまでの継続時間です。短いほど早く確定します。")
-            timeStepper("OFF確認", value: $draft.offConfirmSec, range: 300...1800, step: 30, hint: "消灯判定を確定するまでの継続時間です。長いほど誤検出を抑えます。")
-            timeStepper("クールダウン", value: $draft.cooldownSec, range: 60...1800, step: 30, hint: "通知後、次の通知を抑える時間です。短いほど再通知が早くなります。")
+            numberField("取得間隔", text: $numberFields.captureIntervalSec, suffix: "秒", hint: "短いほど反応は早く、ログ量は増えます。")
+            numberField("短期比較", text: $numberFields.shortDiffSec, suffix: "秒", hint: "何秒前の明るさと比べるかです。短いほど直近の変化を見ます。")
+            numberField("ノイズ計測", text: $numberFields.noiseWindowSec, suffix: "秒", hint: "通常の揺れ幅を測る時間です。短いほど環境変化に早く追従します。")
+            numberField("ON確認", text: $numberFields.onConfirmSec, suffix: "秒", hint: "点灯判定を確定するまでの継続時間です。短いほど早く確定します。")
+            numberField("OFF確認", text: $numberFields.offConfirmSec, suffix: "秒", hint: "消灯判定を確定するまでの継続時間です。長いほど誤検出を抑えます。")
+            numberField("クールダウン", text: $numberFields.cooldownSec, suffix: "秒", hint: "通知後、次の通知を抑える時間です。短いほど再通知が早くなります。")
 
             Divider()
                 .padding(.vertical, 4)
 
-            numberStepper("ON差分しきい値", value: $draft.minDeltaOn, range: 1...80, step: 1, digits: 0, hint: "明るくなったと見る輝度差です。小さいほど検出します。")
-            numberStepper("OFF差分しきい値", value: $draft.minDeltaOff, range: -80 ... -1, step: 1, digits: 0, hint: "暗くなったと見る輝度差です。0に近いほど検出します。")
-            integerStepper("必要positive ROI数", value: $draft.requiredPositiveROICount, range: 1...5, step: 1, hint: "いくつの監視領域が変化したら候補にするかです。")
-            numberStepper("ノイズ倍率", value: $draft.noiseMultiplier, range: 1...10, step: 0.5, digits: 1, hint: "通常の揺れより何倍大きい変化を採用するかです。小さいほど敏感です。")
+            numberField("ON差分しきい値", text: $numberFields.minDeltaOn, suffix: "", hint: "明るくなったと見る輝度差です。小さいほど検出します。")
+            numberField("OFF差分しきい値", text: $numberFields.minDeltaOff, suffix: "", hint: "暗くなったと見る輝度差です。0に近いほど検出します。")
+            numberField("必要positive ROI数", text: $numberFields.requiredPositiveROICount, suffix: "", hint: "いくつの監視領域が変化したら候補にするかです。")
+            numberField("ノイズ倍率", text: $numberFields.noiseMultiplier, suffix: "", hint: "通常の揺れより何倍大きい変化を採用するかです。小さいほど敏感です。")
 
             Spacer()
         }
@@ -273,64 +275,23 @@ private struct SettingsView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func timeStepper(
+    private func numberField(
         _ title: String,
-        value: Binding<TimeInterval>,
-        range: ClosedRange<TimeInterval>,
-        step: TimeInterval,
+        text: Binding<String>,
+        suffix: String,
         hint: String
     ) -> some View {
         settingRow(title) {
             HStack(alignment: .center, spacing: 16) {
-                Stepper(value: value, in: range, step: step) {
-                    Text("\(Int(value.wrappedValue))秒")
-                        .monospacedDigit()
-                        .frame(width: 72, alignment: .leading)
-                }
-                .frame(width: 150, alignment: .leading)
-
-                hintText(hint)
-                    .frame(width: 330, alignment: .leading)
-            }
-        }
-    }
-
-    private func numberStepper(
-        _ title: String,
-        value: Binding<Double>,
-        range: ClosedRange<Double>,
-        step: Double,
-        digits: Int,
-        hint: String
-    ) -> some View {
-        settingRow(title) {
-            HStack(alignment: .center, spacing: 16) {
-                Stepper(value: value, in: range, step: step) {
-                    Text(value.wrappedValue.formatted(.number.precision(.fractionLength(digits))))
-                        .monospacedDigit()
-                        .frame(width: 72, alignment: .leading)
-                }
-                .frame(width: 150, alignment: .leading)
-
-                hintText(hint)
-                    .frame(width: 330, alignment: .leading)
-            }
-        }
-    }
-
-    private func integerStepper(
-        _ title: String,
-        value: Binding<Int>,
-        range: ClosedRange<Int>,
-        step: Int,
-        hint: String
-    ) -> some View {
-        settingRow(title) {
-            HStack(alignment: .center, spacing: 16) {
-                Stepper(value: value, in: range, step: step) {
-                    Text("\(value.wrappedValue)")
-                        .monospacedDigit()
-                        .frame(width: 72, alignment: .leading)
+                HStack(spacing: 6) {
+                    TextField("", text: text)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(width: 86)
+                    if !suffix.isEmpty {
+                        Text(suffix)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .frame(width: 150, alignment: .leading)
 
@@ -342,6 +303,7 @@ private struct SettingsView: View {
 
     private func save() {
         do {
+            draft = try numberFields.applied(to: draft)
             try setLaunchAtLogin(draft.launchAtLogin)
             errorMessage = nil
             onSave(draft)
@@ -360,5 +322,93 @@ private struct SettingsView: View {
                 try SMAppService.mainApp.unregister()
             }
         }
+    }
+}
+
+private struct SettingsNumberFields {
+    var captureIntervalSec: String
+    var shortDiffSec: String
+    var noiseWindowSec: String
+    var onConfirmSec: String
+    var offConfirmSec: String
+    var cooldownSec: String
+    var minDeltaOn: String
+    var minDeltaOff: String
+    var requiredPositiveROICount: String
+    var noiseMultiplier: String
+
+    init(settings: LightWatchSettings) {
+        captureIntervalSec = Self.integerString(settings.captureIntervalSec)
+        shortDiffSec = Self.integerString(settings.shortDiffSec)
+        noiseWindowSec = Self.integerString(settings.noiseWindowSec)
+        onConfirmSec = Self.integerString(settings.onConfirmSec)
+        offConfirmSec = Self.integerString(settings.offConfirmSec)
+        cooldownSec = Self.integerString(settings.cooldownSec)
+        minDeltaOn = Self.integerString(settings.minDeltaOn)
+        minDeltaOff = Self.integerString(settings.minDeltaOff)
+        requiredPositiveROICount = String(settings.requiredPositiveROICount)
+        noiseMultiplier = settings.noiseMultiplier.formatted(.number.precision(.fractionLength(1)))
+    }
+
+    func applied(to settings: LightWatchSettings) throws -> LightWatchSettings {
+        var updatedSettings = settings
+        updatedSettings.captureIntervalSec = try validatedDouble(captureIntervalSec, name: "取得間隔", range: 1...30)
+        updatedSettings.shortDiffSec = try validatedDouble(shortDiffSec, name: "短期比較", range: 1...30)
+        updatedSettings.noiseWindowSec = try validatedDouble(noiseWindowSec, name: "ノイズ計測", range: 60...1800)
+        updatedSettings.onConfirmSec = try validatedDouble(onConfirmSec, name: "ON確認", range: 30...900)
+        updatedSettings.offConfirmSec = try validatedDouble(offConfirmSec, name: "OFF確認", range: 300...1800)
+        updatedSettings.cooldownSec = try validatedDouble(cooldownSec, name: "クールダウン", range: 60...1800)
+        updatedSettings.minDeltaOn = try validatedDouble(minDeltaOn, name: "ON差分しきい値", range: 1...80)
+        updatedSettings.minDeltaOff = try validatedDouble(minDeltaOff, name: "OFF差分しきい値", range: -80 ... -1)
+        updatedSettings.requiredPositiveROICount = try validatedInt(requiredPositiveROICount, name: "必要positive ROI数", range: 1...5)
+        updatedSettings.noiseMultiplier = try validatedDouble(noiseMultiplier, name: "ノイズ倍率", range: 1...10)
+        return updatedSettings
+    }
+
+    private static func integerString(_ value: Double) -> String {
+        String(Int(value))
+    }
+
+    private func validatedDouble(_ text: String, name: String, range: ClosedRange<Double>) throws -> Double {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Double(trimmedText), value.isFinite else {
+            throw SettingsValidationError.invalidNumber(name)
+        }
+        guard range.contains(value) else {
+            throw SettingsValidationError.outOfRange(name, lower: range.lowerBound, upper: range.upperBound)
+        }
+        return value
+    }
+
+    private func validatedInt(_ text: String, name: String, range: ClosedRange<Int>) throws -> Int {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Int(trimmedText) else {
+            throw SettingsValidationError.invalidNumber(name)
+        }
+        guard range.contains(value) else {
+            throw SettingsValidationError.outOfRange(name, lower: Double(range.lowerBound), upper: Double(range.upperBound))
+        }
+        return value
+    }
+}
+
+private enum SettingsValidationError: LocalizedError {
+    case invalidNumber(String)
+    case outOfRange(String, lower: Double, upper: Double)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidNumber(let name):
+            return "\(name)は数値で入力してください。"
+        case .outOfRange(let name, let lower, let upper):
+            return "\(name)は\(format(lower))から\(format(upper))の範囲で入力してください。"
+        }
+    }
+
+    private func format(_ value: Double) -> String {
+        if value.rounded() == value {
+            return String(Int(value))
+        }
+        return value.formatted(.number.precision(.fractionLength(1)))
     }
 }
