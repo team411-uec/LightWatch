@@ -78,6 +78,8 @@ struct LightWatchSettings: Codable, Equatable {
     var minDeltaOn: Double
     var minDeltaOff: Double
     var requiredPositiveROICount: Int
+    var darkReferenceProfile: LightReferenceProfile?
+    var brightReferenceProfile: LightReferenceProfile?
     var rois: [LightROI]
 
     enum CodingKeys: String, CodingKey {
@@ -91,6 +93,8 @@ struct LightWatchSettings: Codable, Equatable {
         case minDeltaOn
         case minDeltaOff
         case requiredPositiveROICount
+        case darkReferenceProfile
+        case brightReferenceProfile
         case rois
     }
 
@@ -105,6 +109,8 @@ struct LightWatchSettings: Codable, Equatable {
         minDeltaOn: Double,
         minDeltaOff: Double,
         requiredPositiveROICount: Int,
+        darkReferenceProfile: LightReferenceProfile?,
+        brightReferenceProfile: LightReferenceProfile?,
         rois: [LightROI]
     ) {
         self.discordWebhookURL = discordWebhookURL
@@ -117,6 +123,8 @@ struct LightWatchSettings: Codable, Equatable {
         self.minDeltaOn = minDeltaOn
         self.minDeltaOff = minDeltaOff
         self.requiredPositiveROICount = requiredPositiveROICount
+        self.darkReferenceProfile = darkReferenceProfile
+        self.brightReferenceProfile = brightReferenceProfile
         self.rois = rois
     }
 
@@ -132,6 +140,8 @@ struct LightWatchSettings: Codable, Equatable {
         minDeltaOn = try container.decode(Double.self, forKey: .minDeltaOn)
         minDeltaOff = try container.decode(Double.self, forKey: .minDeltaOff)
         requiredPositiveROICount = try container.decode(Int.self, forKey: .requiredPositiveROICount)
+        darkReferenceProfile = try container.decodeIfPresent(LightReferenceProfile.self, forKey: .darkReferenceProfile)
+        brightReferenceProfile = try container.decodeIfPresent(LightReferenceProfile.self, forKey: .brightReferenceProfile)
         rois = try container.decode([LightROI].self, forKey: .rois)
     }
 
@@ -146,12 +156,13 @@ struct LightWatchSettings: Codable, Equatable {
         minDeltaOn: 18,
         minDeltaOff: -18,
         requiredPositiveROICount: 2,
+        darkReferenceProfile: nil,
+        brightReferenceProfile: nil,
         rois: [
-            LightROI(name: "wall", kind: .positive, x: 0.05, y: 0.10, width: 0.35, height: 0.35),
-            LightROI(name: "desk", kind: .positive, x: 0.25, y: 0.55, width: 0.35, height: 0.30),
-            LightROI(name: "floor", kind: .positive, x: 0.55, y: 0.55, width: 0.35, height: 0.30),
-            LightROI(name: "window", kind: .negative, x: 0.60, y: 0.05, width: 0.35, height: 0.35),
-            LightROI(name: "monitor", kind: .negative, x: 0.05, y: 0.45, width: 0.20, height: 0.25)
+            LightROI(name: "topLeftEdge", kind: .positive, x: 0.02, y: 0.02, width: 0.26, height: 0.22),
+            LightROI(name: "topRightEdge", kind: .positive, x: 0.72, y: 0.02, width: 0.26, height: 0.22),
+            LightROI(name: "bottomLeftEdge", kind: .positive, x: 0.02, y: 0.76, width: 0.26, height: 0.22),
+            LightROI(name: "bottomRightEdge", kind: .positive, x: 0.72, y: 0.76, width: 0.26, height: 0.22)
         ]
     )
 }

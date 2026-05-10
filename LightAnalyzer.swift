@@ -5,6 +5,7 @@ import Foundation
 final class LightAnalyzer {
     private var settings: LightWatchSettings
     private var history: [LightAnalysisSnapshot] = []
+    private var latestROIStats: [ROIStats] = []
     private let brightThreshold = 180
     private let darkThreshold = 50
 
@@ -21,17 +22,27 @@ final class LightAnalyzer {
         let roiStats = try settings.rois.map { roi in
             try analyzeROI(roi, pixelBuffer: pixelBuffer)
         }
+        latestROIStats = roiStats
+        let sceneClassification = classifyScene(roiStats)
 
         let snapshot = LightAnalysisSnapshot(
             timestamp: timestamp,
             state: state,
             roiStats: roiStats,
-            onSignal: makeOnSignal(currentStats: roiStats, timestamp: timestamp),
-            offSignal: makeOffSignal(currentStats: roiStats, timestamp: timestamp)
+            sceneClassification: sceneClassification,
+            onSignal: makeOnSignal(currentStats: roiStats, sceneClassification: sceneClassification, timestamp: timestamp),
+            offSignal: makeOffSignal(currentStats: roiStats, sceneClassification: sceneClassification, timestamp: timestamp)
         )
         history.append(snapshot)
         trimHistory(now: timestamp)
         return snapshot
+    }
+
+    func makeReferenceProfile(scene: LightScene) throws -> LightReferenceProfile {
+        guard !latestROIStats.isEmpty else {
+            throw LightReferenceProfileError.missingFrame
+        }
+        return try LightSceneProfileBuilder.makeProfile(scene: scene, rois: settings.rois, roiStats: latestROIStats)
     }
 
     private func analyzeROI(_ roi: LightROI, pixelBuffer: CVPixelBuffer) throws -> ROIStats {
@@ -107,7 +118,30 @@ final class LightAnalyzer {
         return 0
     }
 
-    private func makeOnSignal(currentStats: [ROIStats], timestamp: Date) -> LightSignal {
+    private func classifyScene(_ roiStats: [ROIStats]) -> LightSceneClassification? {
+        try? LightSceneClassifier.classify(
+            roiStats: roiStats,
+            darkProfile: settings.darkReferenceProfile,
+            brightProfile: settings.brightReferenceProfile,
+            margin: max(6, min(settings.minDeltaOn, abs(settings.minDeltaOff)) / 2)
+        )
+    }
+
+    private func makeOnSignal(
+        currentStats: [ROIStats],
+        sceneClassification: LightSceneClassification?,
+        timestamp: Date
+    ) -> LightSignal {
+        if let sceneClassification, sceneClassification.scene == .bright {
+            return .changed(
+                roiNames: settings.brightReferenceProfile?.samples.map(\.roiName) ?? [],
+                deltas: [
+                    "dark_distance": sceneClassification.darkDistance,
+                    "bright_distance": sceneClassification.brightDistance
+                ]
+            )
+        }
+
         guard let previous = snapshot(near: timestamp.addingTimeInterval(-settings.shortDiffSec)) else {
             return .none
         }
@@ -129,7 +163,21 @@ final class LightAnalyzer {
         return .changed(roiNames: changed.map(\.name), deltas: deltas(for: changed, from: previous))
     }
 
-    private func makeOffSignal(currentStats: [ROIStats], timestamp: Date) -> LightSignal {
+    private func makeOffSignal(
+        currentStats: [ROIStats],
+        sceneClassification: LightSceneClassification?,
+        timestamp: Date
+    ) -> LightSignal {
+        if let sceneClassification, sceneClassification.scene == .dark {
+            return .changed(
+                roiNames: settings.darkReferenceProfile?.samples.map(\.roiName) ?? [],
+                deltas: [
+                    "dark_distance": sceneClassification.darkDistance,
+                    "bright_distance": sceneClassification.brightDistance
+                ]
+            )
+        }
+
         guard let previous = snapshot(near: timestamp.addingTimeInterval(-settings.shortDiffSec)) else {
             return .none
         }
@@ -191,6 +239,7 @@ struct LightAnalysisSnapshot {
     let timestamp: Date
     let state: LightWatchState
     let roiStats: [ROIStats]
+    let sceneClassification: LightSceneClassification?
     let onSignal: LightSignal
     let offSignal: LightSignal
 

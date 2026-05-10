@@ -172,6 +172,10 @@ final class StateMachine {
     }
 
     private func isOnCandidateStillBright(_ snapshot: LightAnalysisSnapshot) -> Bool {
+        if let sceneClassification = snapshot.sceneClassification {
+            return sceneClassification.scene == .bright
+        }
+
         guard candidateROIReference.count >= settings.requiredPositiveROICount else {
             return false
         }
@@ -186,6 +190,10 @@ final class StateMachine {
     }
 
     private func isOffCandidateStillDark(_ snapshot: LightAnalysisSnapshot) -> Bool {
+        if let sceneClassification = snapshot.sceneClassification {
+            return sceneClassification.scene == .dark
+        }
+
         guard candidateROIReference.count >= settings.requiredPositiveROICount else {
             return false
         }

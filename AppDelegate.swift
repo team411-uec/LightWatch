@@ -35,6 +35,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusBarController.onSettingsChanged = { [weak self] updatedSettings in
                 self?.applySettings(updatedSettings)
             }
+            statusBarController.onReferenceCaptureRequested = { [weak self] scene in
+                guard let self else {
+                    throw LightReferenceProfileError.missingFrame
+                }
+                return try self.captureReferenceProfile(scene: scene)
+            }
             self.statusBarController = statusBarController
 
             logWebhookConfigurationIfNeeded(settings)
@@ -118,6 +124,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             captureInterval: updatedSettings.captureIntervalSec,
             cameraUniqueID: updatedSettings.cameraUniqueID
         )
+    }
+
+    private func captureReferenceProfile(scene: LightScene) throws -> LightReferenceProfile {
+        guard let analyzer else {
+            throw LightReferenceProfileError.missingFrame
+        }
+        return try analyzer.makeReferenceProfile(scene: scene)
     }
 
     private func logWebhookConfigurationIfNeeded(_ settings: LightWatchSettings) {

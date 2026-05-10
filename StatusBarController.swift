@@ -6,6 +6,7 @@ final class StatusBarController: NSObject {
     var onPause: (() -> Void)?
     var onResume: (() -> Void)?
     var onSettingsChanged: ((LightWatchSettings) -> Void)?
+    var onReferenceCaptureRequested: ((LightScene) throws -> LightReferenceProfile)?
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let settingsStore: SettingsStore
@@ -114,6 +115,12 @@ final class StatusBarController: NSObject {
 
         let view = SettingsView(
             settings: currentSettings,
+            onReferenceCaptureRequested: { [weak self] scene in
+                guard let self, let onReferenceCaptureRequested else {
+                    throw LightReferenceProfileError.missingFrame
+                }
+                return try onReferenceCaptureRequested(scene)
+            },
             onSave: { [weak self] updatedSettings in
                 self?.currentSettings = updatedSettings
                 self?.onSettingsChanged?(updatedSettings)
@@ -121,7 +128,7 @@ final class StatusBarController: NSObject {
         )
         let window = NSWindow(contentViewController: NSHostingController(rootView: view))
         window.title = "LightWatch設定"
-        window.setContentSize(NSSize(width: 700, height: 460))
+        window.setContentSize(NSSize(width: 700, height: 540))
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         window.delegate = self
@@ -148,12 +155,19 @@ private struct SettingsView: View {
     @State private var errorMessage: String?
     @State private var selectedTab = SettingsTab.general
     @State private var selectedPresetID = DetectionPreset.standard.id
+    @State private var referenceMessage: String?
+    let onReferenceCaptureRequested: (LightScene) throws -> LightReferenceProfile
     let onSave: (LightWatchSettings) -> Void
 
-    init(settings: LightWatchSettings, onSave: @escaping (LightWatchSettings) -> Void) {
+    init(
+        settings: LightWatchSettings,
+        onReferenceCaptureRequested: @escaping (LightScene) throws -> LightReferenceProfile,
+        onSave: @escaping (LightWatchSettings) -> Void
+    ) {
         _draft = State(initialValue: settings)
         _numberFields = State(initialValue: SettingsNumberFields(settings: settings))
         _cameraOptions = State(initialValue: CameraDeviceCatalog.availableOptions())
+        self.onReferenceCaptureRequested = onReferenceCaptureRequested
         self.onSave = onSave
     }
 
@@ -271,6 +285,11 @@ private struct SettingsView: View {
             numberField("OFF差分しきい値", text: $numberFields.minDeltaOff, suffix: "", hint: "暗くなったと見る輝度差です。0に近いほど検出します。")
             numberField("必要positive ROI数", text: $numberFields.requiredPositiveROICount, suffix: "", hint: "いくつの監視領域が変化したら候補にするかです。")
 
+            Divider()
+                .padding(.vertical, 4)
+
+            referenceProfileRow
+
             Spacer()
         }
         .padding(.horizontal, 24)
@@ -308,6 +327,34 @@ private struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var referenceProfileRow: some View {
+        settingRow("基準画像") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Button("消灯基準を保存") {
+                        captureReferenceProfile(scene: .dark)
+                    }
+                    Button("点灯基準を保存") {
+                        captureReferenceProfile(scene: .bright)
+                    }
+                }
+                hintText(referenceProfileHint)
+                if let referenceMessage {
+                    Text(referenceMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private var referenceProfileHint: String {
+        let darkStatus = draft.darkReferenceProfile == nil ? "未保存" : "保存済み"
+        let brightStatus = draft.brightReferenceProfile == nil ? "未保存" : "保存済み"
+        return "端のpositive ROIだけを使います。消灯: \(darkStatus) / 点灯: \(brightStatus)"
     }
 
     private func hintText(_ text: String) -> some View {
@@ -349,6 +396,24 @@ private struct SettingsView: View {
         }
         numberFields = preset.numberFields
         errorMessage = nil
+    }
+
+    private func captureReferenceProfile(scene: LightScene) {
+        do {
+            let profile = try onReferenceCaptureRequested(scene)
+            switch scene {
+            case .dark:
+                draft.darkReferenceProfile = profile
+                referenceMessage = "消灯基準を取得しました。保存を押すと反映されます。"
+            case .bright:
+                draft.brightReferenceProfile = profile
+                referenceMessage = "点灯基準を取得しました。保存を押すと反映されます。"
+            }
+            errorMessage = nil
+        } catch {
+            referenceMessage = nil
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func save() {
