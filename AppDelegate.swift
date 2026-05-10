@@ -12,6 +12,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cameraManager: CameraManager?
     private var statusBarController: StatusBarController?
     private var powerAssertionID = IOPMAssertionID(0)
+    private var lastNotificationSentAt: Date?
+    private var pendingNotificationWorkItem: DispatchWorkItem?
+    private var pendingNotificationState: LightWatchState?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -48,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        pendingNotificationWorkItem?.cancel()
         cameraManager?.stop()
         stopPowerAssertion()
         if let stateMachine {
@@ -66,9 +70,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cameraManager.onError = { [weak self] message in
             self?.logger?.logError(message)
         }
-        cameraManager.onStatus = { [weak self] message in
-            self?.logger?.logEvent(LightEvent(event: "camera_status", state: nil, reason: message, values: [:]))
-        }
         self.cameraManager = cameraManager
         cameraManager.start()
     }
@@ -78,25 +79,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         do {
             let snapshot = try analyzer.analyze(sampleBuffer: sampleBuffer, state: stateMachine.currentState)
-            logger.logSample(snapshot)
 
             let transitionEvents = stateMachine.handle(snapshot: snapshot)
             settingsStore.saveState(stateMachine.currentState)
+            cancelPendingNotificationIfStateChanged(stateMachine.currentState)
             DispatchQueue.main.async { [weak self] in
                 self?.statusBarController?.update(state: stateMachine.currentState)
             }
 
             for event in transitionEvents {
-                logger.logEvent(event)
                 if let notification = event.notification {
-                    webhookClient?.send(notification: notification) { [weak self] result in
-                        switch result {
-                        case .success:
-                            break
-                        case .failure(let error):
-                            self?.logger?.logError("Discord Webhook送信に失敗しました: \(error.localizedDescription)")
-                        }
-                    }
+                    sendOrSchedule(notification)
                 }
             }
         } catch {
@@ -105,12 +98,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func pauseMonitoring() {
+        pendingNotificationWorkItem?.cancel()
+        pendingNotificationWorkItem = nil
+        pendingNotificationState = nil
         cameraManager?.stop()
         stopPowerAssertion()
         DispatchQueue.main.async { [weak self] in
             self?.statusBarController?.setPaused(true)
         }
-        logger?.logEvent(LightEvent(event: "paused", state: nil, reason: "user_menu", values: [:]))
     }
 
     private func resumeMonitoring() {
@@ -119,7 +114,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self] in
             self?.statusBarController?.setPaused(false)
         }
-        logger?.logEvent(LightEvent(event: "resumed", state: nil, reason: "user_menu", values: [:]))
     }
 
     private func applySettings(_ updatedSettings: LightWatchSettings) {
@@ -160,5 +154,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard powerAssertionID != 0 else { return }
         IOPMAssertionRelease(powerAssertionID)
         powerAssertionID = 0
+    }
+
+    private func sendOrSchedule(_ notification: DiscordNotification) {
+        pendingNotificationWorkItem?.cancel()
+        pendingNotificationWorkItem = nil
+        pendingNotificationState = nil
+
+        let now = Date()
+        let remainingCooldown = lastNotificationSentAt.map {
+            settings.cooldownSec - now.timeIntervalSince($0)
+        } ?? 0
+
+        guard remainingCooldown > 0 else {
+            send(notification)
+            return
+        }
+
+        pendingNotificationState = notification.state
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            guard self.stateMachine?.currentState == notification.state else {
+                self.pendingNotificationState = nil
+                return
+            }
+            self.pendingNotificationState = nil
+            self.send(notification)
+        }
+        pendingNotificationWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + remainingCooldown, execute: workItem)
+    }
+
+    private func cancelPendingNotificationIfStateChanged(_ currentState: LightWatchState) {
+        guard let pendingNotificationState else {
+            return
+        }
+        guard pendingNotificationState != currentState else {
+            return
+        }
+        pendingNotificationWorkItem?.cancel()
+        pendingNotificationWorkItem = nil
+        self.pendingNotificationState = nil
+    }
+
+    private func send(_ notification: DiscordNotification) {
+        lastNotificationSentAt = Date()
+        webhookClient?.send(notification: notification) { [weak self] result in
+            switch result {
+            case .success:
+                break
+            case .failure(let error):
+                self?.logger?.logError("Discord Webhook送信に失敗しました: \(error.localizedDescription)")
+            }
+        }
     }
 }

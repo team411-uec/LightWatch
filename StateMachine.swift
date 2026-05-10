@@ -25,8 +25,6 @@ final class StateMachine {
     private var settings: LightWatchSettings
     private var candidateStartedAt: Date?
     private var candidateROIReference: [String: Double] = [:]
-    private var lastNotificationAt: Date?
-    private var pendingNotification: DiscordNotification?
 
     init(settings: LightWatchSettings, initialState: LightWatchState) {
         self.settings = settings
@@ -38,10 +36,6 @@ final class StateMachine {
     }
 
     func handle(snapshot: LightAnalysisSnapshot) -> [LightEvent] {
-        if let pendingNotificationEvent = makePendingNotificationEvent(at: snapshot.timestamp) {
-            return [pendingNotificationEvent]
-        }
-
         switch currentState {
         case .dark:
             return handleDark(snapshot)
@@ -58,7 +52,6 @@ final class StateMachine {
         guard snapshot.onSignal.isChanged else {
             return []
         }
-        pendingNotification = nil
         currentState = .onCandidate
         candidateStartedAt = snapshot.timestamp
         candidateROIReference = referenceMedians(for: snapshot.onSignal.roiNames, in: snapshot)
@@ -102,14 +95,13 @@ final class StateMachine {
             reason: "複数ROIの輝度上昇が\(Int(settings.onConfirmSec))秒継続",
             confirmSeconds: Int(settings.onConfirmSec)
         )
-        return makeNotificationEvents(notification, at: snapshot.timestamp)
+        return [makeNotificationEvent(notification)]
     }
 
     private func handleBright(_ snapshot: LightAnalysisSnapshot) -> [LightEvent] {
         guard snapshot.offSignal.isChanged else {
             return []
         }
-        pendingNotification = nil
         currentState = .offCandidate
         candidateStartedAt = snapshot.timestamp
         candidateROIReference = referenceMedians(for: snapshot.offSignal.roiNames, in: snapshot)
@@ -153,46 +145,7 @@ final class StateMachine {
             reason: "複数ROIの輝度低下が\(Int(settings.offConfirmSec))秒継続",
             confirmSeconds: Int(settings.offConfirmSec)
         )
-        return makeNotificationEvents(notification, at: snapshot.timestamp)
-    }
-
-    private func canNotify(at date: Date) -> Bool {
-        guard let lastNotificationAt else {
-            return true
-        }
-        return date.timeIntervalSince(lastNotificationAt) >= settings.cooldownSec
-    }
-
-    private func makeNotificationEvents(_ notification: DiscordNotification, at date: Date) -> [LightEvent] {
-        guard canNotify(at: date) else {
-            pendingNotification = notification
-            return [
-                LightEvent(
-                    event: "\(notification.eventName)_pending",
-                    state: currentState.rawValue,
-                    reason: "cooldown",
-                    values: ["confirm_sec": .number(Double(notification.confirmSeconds))]
-                )
-            ]
-        }
-        lastNotificationAt = date
         return [makeNotificationEvent(notification)]
-    }
-
-    private func makePendingNotificationEvent(at date: Date) -> LightEvent? {
-        guard let pendingNotification else {
-            return nil
-        }
-        guard pendingNotification.state == currentState else {
-            self.pendingNotification = nil
-            return nil
-        }
-        guard canNotify(at: date) else {
-            return nil
-        }
-        self.pendingNotification = nil
-        lastNotificationAt = date
-        return makeNotificationEvent(pendingNotification)
     }
 
     private func makeNotificationEvent(_ notification: DiscordNotification) -> LightEvent {
