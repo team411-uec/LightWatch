@@ -50,6 +50,9 @@ final class StateMachine {
     }
 
     private func handleDark(_ snapshot: LightAnalysisSnapshot) -> [LightEvent] {
+        guard isObservable(snapshot) else {
+            return []
+        }
         updateStableReference(with: snapshot)
         guard isBright(snapshot) else {
             return []
@@ -58,6 +61,10 @@ final class StateMachine {
     }
 
     private func handleOnCandidate(_ snapshot: LightAnalysisSnapshot) -> [LightEvent] {
+        guard isObservable(snapshot) else {
+            candidateStartedAt = snapshot.timestamp
+            return []
+        }
         guard isOnCandidateValid(snapshot) else {
             currentState = .dark
             clearCandidate()
@@ -89,6 +96,9 @@ final class StateMachine {
     }
 
     private func handleBright(_ snapshot: LightAnalysisSnapshot) -> [LightEvent] {
+        guard isObservable(snapshot) else {
+            return []
+        }
         updateStableReference(with: snapshot)
         guard isDark(snapshot) else {
             return []
@@ -97,6 +107,10 @@ final class StateMachine {
     }
 
     private func handleOffCandidate(_ snapshot: LightAnalysisSnapshot) -> [LightEvent] {
+        guard isObservable(snapshot) else {
+            candidateStartedAt = snapshot.timestamp
+            return []
+        }
         guard isOffCandidateValid(snapshot) else {
             currentState = .bright
             clearCandidate()
@@ -156,6 +170,9 @@ final class StateMachine {
     }
 
     private func isBright(_ snapshot: LightAnalysisSnapshot) -> Bool {
+        guard isObservable(snapshot) else {
+            return false
+        }
         let level = snapshot.sceneLevel
         if let stableReferenceMedian, level.positiveMedian >= stableReferenceMedian + settings.minDeltaOn {
             return true
@@ -164,6 +181,9 @@ final class StateMachine {
     }
 
     private func isDark(_ snapshot: LightAnalysisSnapshot) -> Bool {
+        guard isObservable(snapshot) else {
+            return false
+        }
         let level = snapshot.sceneLevel
         if let stableReferenceMedian, level.positiveMedian <= stableReferenceMedian + settings.minDeltaOff {
             return true
@@ -192,12 +212,19 @@ final class StateMachine {
     }
 
     private func updateStableReference(with snapshot: LightAnalysisSnapshot) {
+        guard isObservable(snapshot) else {
+            return
+        }
         let currentMedian = snapshot.sceneLevel.positiveMedian
         guard let stableReferenceMedian else {
             self.stableReferenceMedian = currentMedian
             return
         }
         self.stableReferenceMedian = stableReferenceMedian * 0.9 + currentMedian * 0.1
+    }
+
+    private func isObservable(_ snapshot: LightAnalysisSnapshot) -> Bool {
+        snapshot.sceneLevel.observablePositiveCount >= max(3, settings.requiredPositiveROICount)
     }
 
     private func clearCandidate() {
