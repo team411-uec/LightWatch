@@ -81,7 +81,7 @@ final class StateMachine {
         }
 
         let elapsed = snapshot.timestamp.timeIntervalSince(candidateStartedAt)
-        guard elapsed >= settings.onConfirmSec else {
+        guard elapsed >= effectiveOnConfirmSec else {
             return []
         }
 
@@ -92,8 +92,8 @@ final class StateMachine {
             eventName: "notify_on",
             title: "🟢人がいます",
             state: .bright,
-            reason: "複数ROIの輝度上昇が\(Int(settings.onConfirmSec))秒継続",
-            confirmSeconds: Int(settings.onConfirmSec)
+            reason: "複数ROIの輝度上昇が\(Int(effectiveOnConfirmSec))秒継続",
+            confirmSeconds: Int(effectiveOnConfirmSec)
         )
         return [makeNotificationEvent(notification)]
     }
@@ -131,7 +131,7 @@ final class StateMachine {
         }
 
         let elapsed = snapshot.timestamp.timeIntervalSince(candidateStartedAt)
-        guard elapsed >= settings.offConfirmSec else {
+        guard elapsed >= effectiveOffConfirmSec else {
             return []
         }
 
@@ -142,8 +142,8 @@ final class StateMachine {
             eventName: "notify_off",
             title: "⚪人がいません",
             state: .dark,
-            reason: "複数ROIの輝度低下が\(Int(settings.offConfirmSec))秒継続",
-            confirmSeconds: Int(settings.offConfirmSec)
+            reason: "複数ROIの輝度低下が\(Int(effectiveOffConfirmSec))秒継続",
+            confirmSeconds: Int(effectiveOffConfirmSec)
         )
         return [makeNotificationEvent(notification)]
     }
@@ -172,11 +172,7 @@ final class StateMachine {
     }
 
     private func isOnCandidateStillBright(_ snapshot: LightAnalysisSnapshot) -> Bool {
-        if let sceneClassification = snapshot.sceneClassification {
-            return sceneClassification.scene == .bright
-        }
-
-        guard candidateROIReference.count >= settings.requiredPositiveROICount else {
+        guard candidateROIReference.count >= requiredPositiveROICount else {
             return false
         }
         let tolerance = settings.minDeltaOn / 2
@@ -186,15 +182,11 @@ final class StateMachine {
             }
             return current.medianLuma >= referenceMedian - tolerance
         }.count
-        return stableCount >= settings.requiredPositiveROICount
+        return stableCount >= requiredPositiveROICount
     }
 
     private func isOffCandidateStillDark(_ snapshot: LightAnalysisSnapshot) -> Bool {
-        if let sceneClassification = snapshot.sceneClassification {
-            return sceneClassification.scene == .dark
-        }
-
-        guard candidateROIReference.count >= settings.requiredPositiveROICount else {
+        guard candidateROIReference.count >= requiredPositiveROICount else {
             return false
         }
         let tolerance = abs(settings.minDeltaOff) / 2
@@ -202,9 +194,21 @@ final class StateMachine {
             guard let current = snapshot.stat(named: roiName) else {
                 return false
             }
-            return current.isDark && current.medianLuma <= referenceMedian + tolerance
+            return current.medianLuma <= referenceMedian + tolerance
         }.count
-        return stableCount >= settings.requiredPositiveROICount
+        return stableCount >= requiredPositiveROICount
+    }
+
+    private var requiredPositiveROICount: Int {
+        max(3, settings.requiredPositiveROICount)
+    }
+
+    private var effectiveOnConfirmSec: TimeInterval {
+        max(20, settings.onConfirmSec)
+    }
+
+    private var effectiveOffConfirmSec: TimeInterval {
+        max(20, settings.offConfirmSec)
     }
 }
 

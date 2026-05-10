@@ -47,36 +47,13 @@ open build/Build/Products/Debug/LightWatch.app
 
 同じ設定画面で、使用するカメラも選択できます。SplitCamを使う場合は、SplitCamを起動して仮想カメラを作成してから`カメラを再読み込み`を押し、カメラ欄でSplitCamを選んで保存します。
 
-`判定`タブのプリセットを選ぶと、判定用の数値へ反映されます。設定は`保存`を押したあと、次の監視処理から使われます。
+`判定`タブの設定は`保存`を押したあと、次の監視処理から使われます。
 
 Discord通知は`🟢人がいます`または`⚪人がいません`の一行です。
 
-## 基準画像の設定
+## 判定設定
 
-光判定は、消灯時と点灯時の基準プロファイルを使います。基準プロファイルは画像そのものではなく、端のpositive ROIから作った数値です。
-
-アプリ上で保存する場合は、`判定`タブで消灯状態のまま`消灯基準を保存`を押します。10秒後に基準を取得します。次に点灯状態のまま`点灯基準を保存`を押し、同じく10秒後の取得を待ってから`保存`を押します。
-
-撮影済み画像を使う場合は、`判定`タブで`消灯画像を選択`と`点灯画像を選択`を押し、それぞれの画像を選んでから`保存`を押します。
-
-撮影済み画像から生成する場合は、JPEG、PNG、HEICなどmacOSが読み込める画像を使えます。
-
-```sh
-swift scripts/generate-reference-profiles.swift \
-  --dark /path/to/dark.jpg \
-  --bright /path/to/bright.jpg
-```
-
-別の設定ファイルへ書き込む場合は`--config`を指定します。
-
-```sh
-swift scripts/generate-reference-profiles.swift \
-  --dark /path/to/dark.jpg \
-  --bright /path/to/bright.jpg \
-  --config /path/to/config.json
-```
-
-生成結果は`config.json`の`darkReferenceProfile`と`brightReferenceProfile`へ保存されます。判定に使う領域は端のpositive ROIだけです。
+光判定は、端のpositive ROIに出る短時間の輝度変化だけを使います。画像基準との比較は使いません。
 
 設定ファイルは次の場所に保存されます。
 

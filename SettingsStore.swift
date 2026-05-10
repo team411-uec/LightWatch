@@ -78,8 +78,6 @@ struct LightWatchSettings: Codable, Equatable {
     var minDeltaOn: Double
     var minDeltaOff: Double
     var requiredPositiveROICount: Int
-    var darkReferenceProfile: LightReferenceProfile?
-    var brightReferenceProfile: LightReferenceProfile?
     var rois: [LightROI]
 
     enum CodingKeys: String, CodingKey {
@@ -93,8 +91,6 @@ struct LightWatchSettings: Codable, Equatable {
         case minDeltaOn
         case minDeltaOff
         case requiredPositiveROICount
-        case darkReferenceProfile
-        case brightReferenceProfile
         case rois
     }
 
@@ -109,8 +105,6 @@ struct LightWatchSettings: Codable, Equatable {
         minDeltaOn: Double,
         minDeltaOff: Double,
         requiredPositiveROICount: Int,
-        darkReferenceProfile: LightReferenceProfile?,
-        brightReferenceProfile: LightReferenceProfile?,
         rois: [LightROI]
     ) {
         self.discordWebhookURL = discordWebhookURL
@@ -123,8 +117,6 @@ struct LightWatchSettings: Codable, Equatable {
         self.minDeltaOn = minDeltaOn
         self.minDeltaOff = minDeltaOff
         self.requiredPositiveROICount = requiredPositiveROICount
-        self.darkReferenceProfile = darkReferenceProfile
-        self.brightReferenceProfile = brightReferenceProfile
         self.rois = rois
     }
 
@@ -140,8 +132,6 @@ struct LightWatchSettings: Codable, Equatable {
         minDeltaOn = try container.decode(Double.self, forKey: .minDeltaOn)
         minDeltaOff = try container.decode(Double.self, forKey: .minDeltaOff)
         requiredPositiveROICount = try container.decode(Int.self, forKey: .requiredPositiveROICount)
-        darkReferenceProfile = try container.decodeIfPresent(LightReferenceProfile.self, forKey: .darkReferenceProfile)
-        brightReferenceProfile = try container.decodeIfPresent(LightReferenceProfile.self, forKey: .brightReferenceProfile)
         rois = try container.decode([LightROI].self, forKey: .rois)
     }
 
@@ -151,13 +141,11 @@ struct LightWatchSettings: Codable, Equatable {
         launchAtLogin: false,
         captureIntervalSec: 1,
         shortDiffSec: 5,
-        onConfirmSec: 60,
-        offConfirmSec: 600,
+        onConfirmSec: 45,
+        offConfirmSec: 45,
         minDeltaOn: 18,
         minDeltaOff: -18,
-        requiredPositiveROICount: 2,
-        darkReferenceProfile: nil,
-        brightReferenceProfile: nil,
+        requiredPositiveROICount: 3,
         rois: [
             LightROI(name: "topLeftEdge", kind: .positive, x: 0.02, y: 0.02, width: 0.26, height: 0.22),
             LightROI(name: "topRightEdge", kind: .positive, x: 0.72, y: 0.02, width: 0.26, height: 0.22),

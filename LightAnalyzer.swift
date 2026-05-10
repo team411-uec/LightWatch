@@ -23,26 +23,17 @@ final class LightAnalyzer {
             try analyzeROI(roi, pixelBuffer: pixelBuffer)
         }
         latestROIStats = roiStats
-        let sceneClassification = classifyScene(roiStats)
 
         let snapshot = LightAnalysisSnapshot(
             timestamp: timestamp,
             state: state,
             roiStats: roiStats,
-            sceneClassification: sceneClassification,
-            onSignal: makeOnSignal(currentStats: roiStats, sceneClassification: sceneClassification, timestamp: timestamp),
-            offSignal: makeOffSignal(currentStats: roiStats, sceneClassification: sceneClassification, timestamp: timestamp)
+            onSignal: makeOnSignal(currentStats: roiStats, timestamp: timestamp),
+            offSignal: makeOffSignal(currentStats: roiStats, timestamp: timestamp)
         )
         history.append(snapshot)
         trimHistory(now: timestamp)
         return snapshot
-    }
-
-    func makeReferenceProfile(scene: LightScene) throws -> LightReferenceProfile {
-        guard !latestROIStats.isEmpty else {
-            throw LightReferenceProfileError.missingFrame
-        }
-        return try LightSceneProfileBuilder.makeProfile(scene: scene, rois: settings.rois, roiStats: latestROIStats)
     }
 
     private func analyzeROI(_ roi: LightROI, pixelBuffer: CVPixelBuffer) throws -> ROIStats {
@@ -118,49 +109,28 @@ final class LightAnalyzer {
         return 0
     }
 
-    private func classifyScene(_ roiStats: [ROIStats]) -> LightSceneClassification? {
-        try? LightSceneClassifier.classify(
-            roiStats: roiStats,
-            darkProfile: settings.darkReferenceProfile,
-            brightProfile: settings.brightReferenceProfile,
-            margin: max(6, min(settings.minDeltaOn, abs(settings.minDeltaOff)) / 2)
-        )
-    }
-
     private func makeOnSignal(
         currentStats: [ROIStats],
-        sceneClassification: LightSceneClassification?,
         timestamp: Date
     ) -> LightSignal {
-        if let sceneClassification, sceneClassification.scene == .bright {
-            return .changed(
-                roiNames: settings.brightReferenceProfile?.samples.map(\.roiName) ?? [],
-                deltas: [
-                    "dark_distance": sceneClassification.darkDistance,
-                    "bright_distance": sceneClassification.brightDistance
-                ]
-            )
-        }
-
-        guard !hasReferenceProfiles else {
-            return .none
-        }
-
         guard let previous = snapshot(near: timestamp.addingTimeInterval(-settings.shortDiffSec)) else {
             return .none
         }
 
+        let positiveStats = currentStats.filter { $0.kind == .positive }
         let changed = currentStats.filter { current in
             guard current.kind == .positive, let old = previous.stat(named: current.name) else {
                 return false
             }
             let delta = current.medianLuma - old.medianLuma
             let brightDelta = current.brightRatio - old.brightRatio
+            let darkDelta = current.darkRatio - old.darkRatio
             return delta >= settings.minDeltaOn
-                && brightDelta > 0
+                && brightDelta >= 0.03
+                && darkDelta <= -0.03
         }
 
-        guard changed.count >= settings.requiredPositiveROICount else {
+        guard changed.count >= requiredPositiveROICount(availableCount: positiveStats.count) else {
             return .none
         }
 
@@ -169,39 +139,26 @@ final class LightAnalyzer {
 
     private func makeOffSignal(
         currentStats: [ROIStats],
-        sceneClassification: LightSceneClassification?,
         timestamp: Date
     ) -> LightSignal {
-        if let sceneClassification, sceneClassification.scene == .dark {
-            return .changed(
-                roiNames: settings.darkReferenceProfile?.samples.map(\.roiName) ?? [],
-                deltas: [
-                    "dark_distance": sceneClassification.darkDistance,
-                    "bright_distance": sceneClassification.brightDistance
-                ]
-            )
-        }
-
-        guard !hasReferenceProfiles else {
-            return .none
-        }
-
         guard let previous = snapshot(near: timestamp.addingTimeInterval(-settings.shortDiffSec)) else {
             return .none
         }
 
+        let positiveStats = currentStats.filter { $0.kind == .positive }
         let changed = currentStats.filter { current in
             guard current.kind == .positive, let old = previous.stat(named: current.name) else {
                 return false
             }
             let delta = current.medianLuma - old.medianLuma
+            let brightDelta = current.brightRatio - old.brightRatio
+            let darkDelta = current.darkRatio - old.darkRatio
             return delta <= settings.minDeltaOff
-                && current.isDark
-                && current.brightRatio < old.brightRatio
-                && current.darkRatio > old.darkRatio
+                && brightDelta <= -0.03
+                && darkDelta >= 0.03
         }
 
-        guard changed.count >= settings.requiredPositiveROICount else {
+        guard changed.count >= requiredPositiveROICount(availableCount: positiveStats.count) else {
             return .none
         }
 
@@ -228,8 +185,8 @@ final class LightAnalyzer {
         history.removeAll { $0.timestamp < lowerBound }
     }
 
-    private var hasReferenceProfiles: Bool {
-        settings.darkReferenceProfile != nil && settings.brightReferenceProfile != nil
+    private func requiredPositiveROICount(availableCount: Int) -> Int {
+        min(max(3, settings.requiredPositiveROICount), availableCount)
     }
 }
 
@@ -251,7 +208,6 @@ struct LightAnalysisSnapshot {
     let timestamp: Date
     let state: LightWatchState
     let roiStats: [ROIStats]
-    let sceneClassification: LightSceneClassification?
     let onSignal: LightSignal
     let offSignal: LightSignal
 
