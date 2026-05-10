@@ -53,7 +53,6 @@ final class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             }
             if !session.isRunning {
                 session.startRunning()
-                scheduleCameraControlsLock()
                 onStatus?("カメラ監視を開始しました: \(activeCameraName())")
             }
         } catch {
@@ -107,8 +106,6 @@ final class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
             throw CameraError.deviceNotFound
         }
 
-        prepareAutomaticCameraControls(for: device)
-
         session.beginConfiguration()
         session.sessionPreset = .low
         session.inputs.forEach { session.removeInput($0) }
@@ -133,47 +130,6 @@ final class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         session.addOutput(videoOutput)
         session.commitConfiguration()
         isConfigured = true
-    }
-
-    private func prepareAutomaticCameraControls(for device: AVCaptureDevice) {
-        do {
-            try device.lockForConfiguration()
-            defer { device.unlockForConfiguration() }
-
-            if device.isExposureModeSupported(.continuousAutoExposure) {
-                device.exposureMode = .continuousAutoExposure
-            }
-            if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
-                device.whiteBalanceMode = .continuousAutoWhiteBalance
-            }
-        } catch {
-            onError?("カメラ自動調整の準備に失敗しました: \(error.localizedDescription)")
-        }
-    }
-
-    private func scheduleCameraControlsLock() {
-        outputQueue.asyncAfter(deadline: .now() + 3) { [weak self] in
-            guard let self, self.session.isRunning else { return }
-            guard let input = self.session.inputs.first as? AVCaptureDeviceInput else { return }
-            self.lockCameraControls(for: input.device)
-        }
-    }
-
-    private func lockCameraControls(for device: AVCaptureDevice) {
-        do {
-            try device.lockForConfiguration()
-            defer { device.unlockForConfiguration() }
-
-            if device.isExposureModeSupported(.locked) {
-                device.exposureMode = .locked
-            }
-
-            if device.isWhiteBalanceModeSupported(.locked) {
-                device.whiteBalanceMode = .locked
-            }
-        } catch {
-            onError?("カメラ露出固定に失敗しました: \(error.localizedDescription)")
-        }
     }
 
     func captureOutput(
