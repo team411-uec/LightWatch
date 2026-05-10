@@ -51,6 +51,31 @@ open build/Build/Products/Debug/LightWatch.app
 
 Discord通知は`🟢人がいます`または`⚪人がいません`の一行です。
 
+## 基準画像の設定
+
+光判定は、消灯時と点灯時の基準プロファイルを使います。基準プロファイルは画像そのものではなく、端のpositive ROIから作った数値です。
+
+アプリ上で保存する場合は、`判定`タブで消灯状態のまま`消灯基準を保存`を押し、点灯状態のまま`点灯基準を保存`を押してから`保存`を押します。
+
+撮影済み画像から生成する場合は、JPEG、PNG、HEICなどmacOSが読み込める画像を使えます。
+
+```sh
+swift scripts/generate-reference-profiles.swift \
+  --dark /path/to/dark.jpg \
+  --bright /path/to/bright.jpg
+```
+
+別の設定ファイルへ書き込む場合は`--config`を指定します。
+
+```sh
+swift scripts/generate-reference-profiles.swift \
+  --dark /path/to/dark.jpg \
+  --bright /path/to/bright.jpg \
+  --config /path/to/config.json
+```
+
+生成結果は`config.json`の`darkReferenceProfile`と`brightReferenceProfile`へ保存されます。判定に使う領域は端のpositive ROIだけです。
+
 設定ファイルは次の場所に保存されます。
 
 ```text
