@@ -29,6 +29,8 @@ enum LightReferenceProfileError: LocalizedError {
     case missingReference
     case insufficientCommonROI
     case cameraCovered
+    case imageLoadFailed(String)
+    case imageRenderFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -42,6 +44,10 @@ enum LightReferenceProfileError: LocalizedError {
             return "基準比較に使える共通ROIが足りません。"
         case .cameraCovered:
             return "カメラが覆われています。"
+        case .imageLoadFailed(let path):
+            return "画像を読み込めません: \(path)"
+        case .imageRenderFailed(let path):
+            return "画像を解析用に変換できません: \(path)"
         }
     }
 }
@@ -72,6 +78,7 @@ enum LightSceneProfileBuilder {
 
         return LightReferenceProfile(scene: scene, samples: samples)
     }
+
 }
 
 enum LightSceneClassifier {
@@ -157,7 +164,7 @@ enum LightSceneClassifier {
     }
 }
 
-private extension LightROI {
+extension LightROI {
     var isEdgeArea: Bool {
         x <= 0.12 || y <= 0.12 || x + width >= 0.88 || y + height >= 0.88
     }

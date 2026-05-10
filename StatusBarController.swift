@@ -1,12 +1,14 @@
 import AppKit
 import ServiceManagement
 import SwiftUI
+import UniformTypeIdentifiers
 
 final class StatusBarController: NSObject {
     var onPause: (() -> Void)?
     var onResume: (() -> Void)?
     var onSettingsChanged: ((LightWatchSettings) -> Void)?
     var onReferenceCaptureRequested: ((LightScene) throws -> LightReferenceProfile)?
+    var onReferenceImageSelected: ((LightScene, URL) throws -> LightReferenceProfile)?
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let settingsStore: SettingsStore
@@ -121,6 +123,12 @@ final class StatusBarController: NSObject {
                 }
                 return try onReferenceCaptureRequested(scene)
             },
+            onReferenceImageSelected: { [weak self] scene, imageURL in
+                guard let self, let onReferenceImageSelected else {
+                    throw LightReferenceProfileError.missingFrame
+                }
+                return try onReferenceImageSelected(scene, imageURL)
+            },
             onSave: { [weak self] updatedSettings in
                 self?.currentSettings = updatedSettings
                 self?.onSettingsChanged?(updatedSettings)
@@ -163,17 +171,20 @@ private struct SettingsView: View {
     @State private var referenceMessage: String?
     @State private var referenceCountdown: ReferenceCountdown?
     let onReferenceCaptureRequested: (LightScene) throws -> LightReferenceProfile
+    let onReferenceImageSelected: (LightScene, URL) throws -> LightReferenceProfile
     let onSave: (LightWatchSettings) -> Void
 
     init(
         settings: LightWatchSettings,
         onReferenceCaptureRequested: @escaping (LightScene) throws -> LightReferenceProfile,
+        onReferenceImageSelected: @escaping (LightScene, URL) throws -> LightReferenceProfile,
         onSave: @escaping (LightWatchSettings) -> Void
     ) {
         _draft = State(initialValue: settings)
         _numberFields = State(initialValue: SettingsNumberFields(settings: settings))
         _cameraOptions = State(initialValue: CameraDeviceCatalog.availableOptions())
         self.onReferenceCaptureRequested = onReferenceCaptureRequested
+        self.onReferenceImageSelected = onReferenceImageSelected
         self.onSave = onSave
     }
 
@@ -352,6 +363,16 @@ private struct SettingsView: View {
                     }
                     .disabled(referenceCountdown != nil)
                 }
+                HStack(spacing: 8) {
+                    Button("消灯画像を選択") {
+                        selectReferenceImage(scene: .dark)
+                    }
+                    .disabled(referenceCountdown != nil)
+                    Button("点灯画像を選択") {
+                        selectReferenceImage(scene: .bright)
+                    }
+                    .disabled(referenceCountdown != nil)
+                }
                 hintText(referenceProfileHint)
                 if let referenceCountdown {
                     countdownView(referenceCountdown)
@@ -483,6 +504,36 @@ private struct SettingsView: View {
     private func cancelReferenceCountdown() {
         referenceCountdown = nil
         referenceMessage = "基準取得を中止しました。"
+    }
+
+    private func selectReferenceImage(scene: LightScene) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.image]
+        panel.title = "\(sceneName(scene))基準画像を選択"
+        panel.prompt = "選択"
+
+        guard panel.runModal() == .OK, let imageURL = panel.url else {
+            return
+        }
+
+        do {
+            let profile = try onReferenceImageSelected(scene, imageURL)
+            switch scene {
+            case .dark:
+                draft.darkReferenceProfile = profile
+                referenceMessage = "消灯画像から基準を取得しました。保存を押すと反映されます。"
+            case .bright:
+                draft.brightReferenceProfile = profile
+                referenceMessage = "点灯画像から基準を取得しました。保存を押すと反映されます。"
+            }
+            errorMessage = nil
+        } catch {
+            referenceMessage = nil
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func captureReferenceProfile(scene: LightScene) {

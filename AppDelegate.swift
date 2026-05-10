@@ -41,6 +41,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 return try self.captureReferenceProfile(scene: scene)
             }
+            statusBarController.onReferenceImageSelected = { [weak self] scene, imageURL in
+                guard let self else {
+                    throw LightReferenceProfileError.missingFrame
+                }
+                return try self.makeReferenceProfile(scene: scene, imageURL: imageURL)
+            }
             self.statusBarController = statusBarController
 
             logWebhookConfigurationIfNeeded(settings)
@@ -131,6 +137,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             throw LightReferenceProfileError.missingFrame
         }
         return try analyzer.makeReferenceProfile(scene: scene)
+    }
+
+    private func makeReferenceProfile(scene: LightScene, imageURL: URL) throws -> LightReferenceProfile {
+        try LightSceneProfileBuilder.makeProfile(scene: scene, imageURL: imageURL, rois: settings.rois)
     }
 
     private func logWebhookConfigurationIfNeeded(_ settings: LightWatchSettings) {
