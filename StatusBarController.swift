@@ -152,6 +152,8 @@ extension StatusBarController: NSWindowDelegate {
 }
 
 private struct SettingsView: View {
+    private let referenceCaptureDelaySec = 10
+    private let referenceCountdownTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     @State private var draft: LightWatchSettings
     @State private var numberFields: SettingsNumberFields
     @State private var cameraOptions: [CameraDeviceOption]
@@ -159,6 +161,7 @@ private struct SettingsView: View {
     @State private var selectedTab = SettingsTab.general
     @State private var selectedPresetID = DetectionPreset.standard.id
     @State private var referenceMessage: String?
+    @State private var referenceCountdown: ReferenceCountdown?
     let onReferenceCaptureRequested: (LightScene) throws -> LightReferenceProfile
     let onSave: (LightWatchSettings) -> Void
 
@@ -223,6 +226,9 @@ private struct SettingsView: View {
         }
         .frame(width: 700, height: 520)
         .background(Color(nsColor: .windowBackgroundColor))
+        .onReceive(referenceCountdownTimer) { _ in
+            updateReferenceCountdown()
+        }
     }
 
     private var generalPane: some View {
@@ -337,14 +343,19 @@ private struct SettingsView: View {
         settingRow("基準画像") {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Button("消灯基準を保存") {
-                        captureReferenceProfile(scene: .dark)
+                    Button(referenceButtonTitle(scene: .dark)) {
+                        startReferenceCountdown(scene: .dark)
                     }
-                    Button("点灯基準を保存") {
-                        captureReferenceProfile(scene: .bright)
+                    .disabled(referenceCountdown != nil)
+                    Button(referenceButtonTitle(scene: .bright)) {
+                        startReferenceCountdown(scene: .bright)
                     }
+                    .disabled(referenceCountdown != nil)
                 }
                 hintText(referenceProfileHint)
+                if let referenceCountdown {
+                    countdownView(referenceCountdown)
+                }
                 if let referenceMessage {
                     Text(referenceMessage)
                         .font(.caption)
@@ -359,6 +370,52 @@ private struct SettingsView: View {
         let darkStatus = draft.darkReferenceProfile == nil ? "未保存" : "保存済み"
         let brightStatus = draft.brightReferenceProfile == nil ? "未保存" : "保存済み"
         return "端のpositive ROIだけを使います。消灯: \(darkStatus) / 点灯: \(brightStatus)"
+    }
+
+    private func countdownView(_ countdown: ReferenceCountdown) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "camera.metering.matrix")
+                    .foregroundStyle(.tint)
+                Text("\(sceneName(countdown.scene))基準を\(countdown.remainingSeconds)秒後に取得します")
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                Spacer()
+                Button("中止") {
+                    cancelReferenceCountdown()
+                }
+                .controlSize(.small)
+            }
+            ProgressView(
+                value: Double(referenceCaptureDelaySec - countdown.remainingSeconds),
+                total: Double(referenceCaptureDelaySec)
+            )
+            .progressViewStyle(.linear)
+            .tint(.accentColor)
+        }
+        .padding(10)
+        .frame(width: 420, alignment: .leading)
+        .background(Color(nsColor: .separatorColor).opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func referenceButtonTitle(scene: LightScene) -> String {
+        guard let referenceCountdown else {
+            return scene == .dark ? "消灯基準を保存" : "点灯基準を保存"
+        }
+        guard referenceCountdown.scene == scene else {
+            return scene == .dark ? "消灯基準を保存" : "点灯基準を保存"
+        }
+        return "\(sceneName(scene))基準を準備中"
+    }
+
+    private func sceneName(_ scene: LightScene) -> String {
+        switch scene {
+        case .dark:
+            return "消灯"
+        case .bright:
+            return "点灯"
+        }
     }
 
     private func hintText(_ text: String) -> some View {
@@ -400,6 +457,32 @@ private struct SettingsView: View {
         }
         numberFields = preset.numberFields
         errorMessage = nil
+    }
+
+    private func startReferenceCountdown(scene: LightScene) {
+        referenceCountdown = ReferenceCountdown(scene: scene, remainingSeconds: referenceCaptureDelaySec)
+        referenceMessage = "カメラ前から離れてください。"
+        errorMessage = nil
+    }
+
+    private func updateReferenceCountdown() {
+        guard let countdown = referenceCountdown else {
+            return
+        }
+
+        let remainingSeconds = countdown.remainingSeconds - 1
+        guard remainingSeconds > 0 else {
+            referenceCountdown = nil
+            captureReferenceProfile(scene: countdown.scene)
+            return
+        }
+
+        referenceCountdown = ReferenceCountdown(scene: countdown.scene, remainingSeconds: remainingSeconds)
+    }
+
+    private func cancelReferenceCountdown() {
+        referenceCountdown = nil
+        referenceMessage = "基準取得を中止しました。"
     }
 
     private func captureReferenceProfile(scene: LightScene) {
@@ -449,4 +532,9 @@ private struct SettingsView: View {
 private enum SettingsTab {
     case general
     case detection
+}
+
+private struct ReferenceCountdown: Equatable {
+    let scene: LightScene
+    let remainingSeconds: Int
 }
