@@ -151,6 +151,10 @@ final class LightAnalyzer {
         currentStats: [ROIStats],
         timestamp: Date
     ) -> LightSignal {
+        if let absoluteDarkSignal = makeAbsoluteDarkSignal(currentStats: currentStats) {
+            return absoluteDarkSignal
+        }
+
         guard let previous = snapshot(near: timestamp.addingTimeInterval(-settings.shortDiffSec)) else {
             return .none
         }
@@ -183,6 +187,22 @@ final class LightAnalyzer {
         }
 
         return .changed(roiNames: changed.map(\.name), deltas: deltas(for: changed, from: previous, context: changeContext))
+    }
+
+    private func makeAbsoluteDarkSignal(currentStats: [ROIStats]) -> LightSignal? {
+        let positiveStats = currentStats.filter { $0.kind == .positive }
+        let darkStats = positiveStats.filter { stat in
+            stat.medianLuma <= Double(darkThreshold)
+                && stat.darkRatio >= 0.60
+                && stat.brightRatio <= 0.02
+        }
+        guard darkStats.count >= requiredPositiveROICount(availableCount: positiveStats.count) else {
+            return nil
+        }
+        return .changed(
+            roiNames: darkStats.map(\.name),
+            deltas: Dictionary(uniqueKeysWithValues: darkStats.map { ("\($0.name)_median", $0.medianLuma) })
+        )
     }
 
     private func makeGlobalOnSignal(
