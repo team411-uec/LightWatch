@@ -194,7 +194,7 @@ final class StateMachine {
             guard let current = snapshot.stat(named: roiName) else {
                 return false
             }
-            return current.medianLuma <= referenceMedian + tolerance
+            return current.isDark && current.medianLuma <= referenceMedian + tolerance
         }.count
         return stableCount >= settings.requiredPositiveROICount
     }

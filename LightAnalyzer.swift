@@ -84,12 +84,14 @@ final class LightAnalyzer {
             throw LightAnalyzerError.emptyROI
         }
 
+        let medianLuma = median(from: histogram, sampleCount: sampleCount)
         return ROIStats(
             name: roi.name,
             kind: roi.kind,
-            medianLuma: median(from: histogram, sampleCount: sampleCount),
+            medianLuma: medianLuma,
             brightRatio: Double(brightCount) / Double(sampleCount),
-            darkRatio: Double(darkCount) / Double(sampleCount)
+            darkRatio: Double(darkCount) / Double(sampleCount),
+            isDark: medianLuma <= Double(darkThreshold)
         )
     }
 
@@ -138,6 +140,7 @@ final class LightAnalyzer {
             }
             let delta = current.medianLuma - old.medianLuma
             return delta <= settings.minDeltaOff
+                && current.isDark
                 && current.brightRatio < old.brightRatio
                 && current.darkRatio > old.darkRatio
         }
@@ -202,6 +205,7 @@ struct ROIStats {
     let medianLuma: Double
     let brightRatio: Double
     let darkRatio: Double
+    let isDark: Bool
 }
 
 enum LightSignal {
