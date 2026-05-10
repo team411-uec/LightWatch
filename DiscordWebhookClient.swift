@@ -20,7 +20,7 @@ final class DiscordWebhookClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: [
-            "content": "\(notification.title)\n状態: \(notification.state.displayName)\n理由: \(notification.reason)"
+            "content": notification.title
         ])
 
         session.dataTask(with: request) { _, response, error in

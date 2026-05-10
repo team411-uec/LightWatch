@@ -54,9 +54,9 @@ struct SettingsNumberFields: Equatable {
         updatedSettings.captureIntervalSec = try validatedDouble(captureIntervalSec, name: "取得間隔", range: 1...30)
         updatedSettings.shortDiffSec = try validatedDouble(shortDiffSec, name: "短期比較", range: 1...30)
         updatedSettings.noiseWindowSec = try validatedDouble(noiseWindowSec, name: "ノイズ計測", range: 60...1800)
-        updatedSettings.onConfirmSec = try validatedDouble(onConfirmSec, name: "ON確認", range: 30...900)
-        updatedSettings.offConfirmSec = try validatedDouble(offConfirmSec, name: "OFF確認", range: 300...1800)
-        updatedSettings.cooldownSec = try validatedDouble(cooldownSec, name: "クールダウン", range: 60...1800)
+        updatedSettings.onConfirmSec = try validatedDouble(onConfirmSec, name: "ON確認", range: 1...900)
+        updatedSettings.offConfirmSec = try validatedDouble(offConfirmSec, name: "OFF確認", range: 1...1800)
+        updatedSettings.cooldownSec = try validatedDouble(cooldownSec, name: "クールダウン", range: 1...1800)
         updatedSettings.minDeltaOn = try validatedDouble(minDeltaOn, name: "ON差分しきい値", range: 1...80)
         updatedSettings.minDeltaOff = try validatedDouble(minDeltaOff, name: "OFF差分しきい値", range: -80 ... -1)
         updatedSettings.requiredPositiveROICount = try validatedInt(requiredPositiveROICount, name: "必要positive ROI数", range: 1...5)
@@ -127,9 +127,9 @@ struct DetectionPreset: Identifiable, Equatable {
             captureIntervalSec: 1,
             shortDiffSec: 3,
             noiseWindowSec: 60,
-            onConfirmSec: 30,
-            offConfirmSec: 300,
-            cooldownSec: 60,
+            onConfirmSec: 5,
+            offConfirmSec: 5,
+            cooldownSec: 10,
             minDeltaOn: 12,
             minDeltaOff: -12,
             requiredPositiveROICount: 1,

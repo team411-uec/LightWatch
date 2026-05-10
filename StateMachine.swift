@@ -97,7 +97,7 @@ final class StateMachine {
         lastNotificationAt = snapshot.timestamp
         let notification = DiscordNotification(
             eventName: "notify_on",
-            title: "照明変化を検出しました",
+            title: "🟢人がいます",
             state: .bright,
             reason: "複数ROIの輝度上昇が\(Int(settings.onConfirmSec))秒継続",
             confirmSeconds: Int(settings.onConfirmSec)
@@ -161,7 +161,7 @@ final class StateMachine {
         lastNotificationAt = snapshot.timestamp
         let notification = DiscordNotification(
             eventName: "notify_off",
-            title: "使用状態の明るさが消えました",
+            title: "⚪人がいません",
             state: .dark,
             reason: "複数ROIの輝度低下が\(Int(settings.offConfirmSec))秒継続",
             confirmSeconds: Int(settings.offConfirmSec)
