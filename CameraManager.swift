@@ -4,31 +4,59 @@ import Foundation
 final class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     var onSampleBuffer: ((CMSampleBuffer) -> Void)?
     var onError: ((String) -> Void)?
+    var onStatus: ((String) -> Void)?
 
     private let session = AVCaptureSession()
+    private let videoOutput = AVCaptureVideoDataOutput()
     private let outputQueue = DispatchQueue(label: "LightWatch.CameraOutput")
     private var captureInterval: TimeInterval
+    private var cameraUniqueID: String
     private var lastDeliveredAt: Date?
     private var isConfigured = false
 
-    init(captureInterval: TimeInterval) {
+    init(captureInterval: TimeInterval, cameraUniqueID: String) {
         self.captureInterval = captureInterval
+        self.cameraUniqueID = cameraUniqueID
         super.init()
     }
 
     func start() {
         outputQueue.async { [weak self] in
             guard let self else { return }
-            do {
-                if !self.isConfigured {
-                    try self.configureSession()
+            switch AVCaptureDevice.authorizationStatus(for: .video) {
+            case .authorized:
+                self.startConfiguredSession()
+            case .notDetermined:
+                self.onStatus?("カメラ権限の許可待ちです。")
+                AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                    self?.outputQueue.async {
+                        guard let self else { return }
+                        if granted {
+                            self.startConfiguredSession()
+                        } else {
+                            self.onError?("カメラ開始に失敗しました: \(CameraError.permissionDenied.localizedDescription)")
+                        }
+                    }
                 }
-                if !self.session.isRunning {
-                    self.session.startRunning()
-                }
-            } catch {
-                self.onError?("カメラ開始に失敗しました: \(error.localizedDescription)")
+            case .denied, .restricted:
+                self.onError?("カメラ開始に失敗しました: \(CameraError.permissionDenied.localizedDescription)")
+            @unknown default:
+                self.onError?("カメラ開始に失敗しました: \(CameraError.permissionDenied.localizedDescription)")
             }
+        }
+    }
+
+    private func startConfiguredSession() {
+        do {
+            if !isConfigured {
+                try configureSession()
+            }
+            if !session.isRunning {
+                session.startRunning()
+                onStatus?("カメラ監視を開始しました: \(activeCameraName())")
+            }
+        } catch {
+            onError?("カメラ開始に失敗しました: \(error.localizedDescription)")
         }
     }
 
@@ -41,38 +69,47 @@ final class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         }
     }
 
-    func update(captureInterval: TimeInterval) {
+    func update(captureInterval: TimeInterval, cameraUniqueID: String) {
         outputQueue.async { [weak self] in
-            self?.captureInterval = captureInterval
+            guard let self else { return }
+            self.captureInterval = captureInterval
+            guard self.cameraUniqueID != cameraUniqueID else {
+                return
+            }
+            self.cameraUniqueID = cameraUniqueID
+            do {
+                let wasRunning = self.session.isRunning
+                try self.configureSession()
+                if wasRunning && !self.session.isRunning {
+                    self.session.startRunning()
+                }
+                self.onStatus?("カメラ設定を更新しました: \(self.activeCameraName())")
+            } catch {
+                self.onError?("カメラ設定の更新に失敗しました: \(error.localizedDescription)")
+            }
         }
     }
 
     private func configureSession() throws {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized:
-            break
-        case .notDetermined:
-            let semaphore = DispatchSemaphore(value: 0)
-            AVCaptureDevice.requestAccess(for: .video) { _ in
-                semaphore.signal()
-            }
-            semaphore.wait()
-        case .denied, .restricted:
-            throw CameraError.permissionDenied
-        @unknown default:
-            throw CameraError.permissionDenied
-        }
-
         guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
             throw CameraError.permissionDenied
         }
 
-        guard let device = AVCaptureDevice.default(for: .video) else {
+        let device: AVCaptureDevice?
+        if cameraUniqueID.isEmpty {
+            device = AVCaptureDevice.default(for: .video)
+        } else {
+            device = AVCaptureDevice(uniqueID: cameraUniqueID)
+        }
+
+        guard let device else {
             throw CameraError.deviceNotFound
         }
 
         session.beginConfiguration()
         session.sessionPreset = .low
+        session.inputs.forEach { session.removeInput($0) }
+        session.outputs.forEach { session.removeOutput($0) }
 
         let input = try AVCaptureDeviceInput(device: device)
         guard session.canAddInput(input) else {
@@ -81,7 +118,6 @@ final class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         }
         session.addInput(input)
 
-        let videoOutput = AVCaptureVideoDataOutput()
         videoOutput.alwaysDiscardsLateVideoFrames = true
         videoOutput.videoSettings = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
@@ -107,6 +143,31 @@ final class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         }
         lastDeliveredAt = now
         onSampleBuffer?(sampleBuffer)
+    }
+
+    private func activeCameraName() -> String {
+        guard let input = session.inputs.first as? AVCaptureDeviceInput else {
+            return "未設定"
+        }
+        return input.device.localizedName
+    }
+}
+
+struct CameraDeviceOption: Identifiable, Equatable {
+    let id: String
+    let name: String
+}
+
+enum CameraDeviceCatalog {
+    static func availableOptions() -> [CameraDeviceOption] {
+        AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInWideAngleCamera, .externalUnknown],
+            mediaType: .video,
+            position: .unspecified
+        )
+        .devices
+            .map { CameraDeviceOption(id: $0.uniqueID, name: $0.localizedName) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 }
 

@@ -43,7 +43,9 @@ open build/Build/Products/Debug/LightWatch.app
 
 ## Webhook URLの設定
 
-メニューバーの`LightWatch`から`設定を開く`を選び、`Discord Webhook URL`へDiscordのWebhook URLを入力して保存します。
+メニューバーの電球アイコンから`設定を開く`を選び、`Discord Webhook URL`へDiscordのWebhook URLを入力して保存します。
+
+同じ設定画面で、使用するカメラも選択できます。SplitCamを使う場合は、SplitCamを起動して仮想カメラを作成してから`カメラを再読み込み`を押し、カメラ欄でSplitCamを選んで保存します。
 
 設定ファイルは次の場所に保存されます。
 
@@ -59,11 +61,12 @@ open build/Build/Products/Debug/LightWatch.app
 
 1. `LightWatch.app`を起動します。
 2. カメラ権限を許可します。
-3. メニューバーの`LightWatch`から`設定を開く`を選びます。
+3. メニューバーの電球アイコンから`設定を開く`を選びます。
 4. `Discord Webhook URL`を保存します。
-5. `ログイン時に起動`を有効にします。
+5. SplitCamを使う場合は、カメラ欄でSplitCamを選んで保存します。
+6. `ログイン時に起動`を有効にします。
 
-アプリはメニューバーに常駐します。Dockには表示されません。
+アプリはメニューバーにアイコンだけで常駐します。Dockには表示されません。
 
 ## 動作確認
 
@@ -77,7 +80,7 @@ pgrep -fl LightWatch
 
 ## ログ
 
-メニューバーの`LightWatch`から`ログを開く`を選ぶとログディレクトリを開けます。
+メニューバーの電球アイコンから`ログを開く`を選ぶとログディレクトリを開けます。
 
 ```text
 ~/Library/Application Support/LightWatch/logs/

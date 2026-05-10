@@ -56,12 +56,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startCamera() {
-        let cameraManager = CameraManager(captureInterval: settings.captureIntervalSec)
+        let cameraManager = CameraManager(
+            captureInterval: settings.captureIntervalSec,
+            cameraUniqueID: settings.cameraUniqueID
+        )
         cameraManager.onSampleBuffer = { [weak self] sampleBuffer in
             self?.handleSampleBuffer(sampleBuffer)
         }
         cameraManager.onError = { [weak self] message in
             self?.logger?.logError(message)
+        }
+        cameraManager.onStatus = { [weak self] message in
+            self?.logger?.logEvent(LightEvent(event: "camera_status", state: nil, reason: message, values: [:]))
         }
         self.cameraManager = cameraManager
         cameraManager.start()
@@ -122,7 +128,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         logWebhookConfigurationIfNeeded(updatedSettings)
         analyzer = LightAnalyzer(settings: updatedSettings)
         stateMachine?.update(settings: updatedSettings)
-        cameraManager?.update(captureInterval: updatedSettings.captureIntervalSec)
+        cameraManager?.update(
+            captureInterval: updatedSettings.captureIntervalSec,
+            cameraUniqueID: updatedSettings.cameraUniqueID
+        )
     }
 
     private func logWebhookConfigurationIfNeeded(_ settings: LightWatchSettings) {

@@ -67,6 +67,7 @@ final class SettingsStore {
 
 struct LightWatchSettings: Codable, Equatable {
     var discordWebhookURL: String
+    var cameraUniqueID: String
     var launchAtLogin: Bool
     var captureIntervalSec: TimeInterval
     var shortDiffSec: TimeInterval
@@ -80,8 +81,76 @@ struct LightWatchSettings: Codable, Equatable {
     var noiseMultiplier: Double
     var rois: [LightROI]
 
+    enum CodingKeys: String, CodingKey {
+        case discordWebhookURL
+        case cameraUniqueID
+        case launchAtLogin
+        case captureIntervalSec
+        case shortDiffSec
+        case noiseWindowSec
+        case onConfirmSec
+        case offConfirmSec
+        case cooldownSec
+        case minDeltaOn
+        case minDeltaOff
+        case requiredPositiveROICount
+        case noiseMultiplier
+        case rois
+    }
+
+    init(
+        discordWebhookURL: String,
+        cameraUniqueID: String,
+        launchAtLogin: Bool,
+        captureIntervalSec: TimeInterval,
+        shortDiffSec: TimeInterval,
+        noiseWindowSec: TimeInterval,
+        onConfirmSec: TimeInterval,
+        offConfirmSec: TimeInterval,
+        cooldownSec: TimeInterval,
+        minDeltaOn: Double,
+        minDeltaOff: Double,
+        requiredPositiveROICount: Int,
+        noiseMultiplier: Double,
+        rois: [LightROI]
+    ) {
+        self.discordWebhookURL = discordWebhookURL
+        self.cameraUniqueID = cameraUniqueID
+        self.launchAtLogin = launchAtLogin
+        self.captureIntervalSec = captureIntervalSec
+        self.shortDiffSec = shortDiffSec
+        self.noiseWindowSec = noiseWindowSec
+        self.onConfirmSec = onConfirmSec
+        self.offConfirmSec = offConfirmSec
+        self.cooldownSec = cooldownSec
+        self.minDeltaOn = minDeltaOn
+        self.minDeltaOff = minDeltaOff
+        self.requiredPositiveROICount = requiredPositiveROICount
+        self.noiseMultiplier = noiseMultiplier
+        self.rois = rois
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        discordWebhookURL = try container.decode(String.self, forKey: .discordWebhookURL)
+        cameraUniqueID = try container.decodeIfPresent(String.self, forKey: .cameraUniqueID) ?? ""
+        launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)
+        captureIntervalSec = try container.decode(TimeInterval.self, forKey: .captureIntervalSec)
+        shortDiffSec = try container.decode(TimeInterval.self, forKey: .shortDiffSec)
+        noiseWindowSec = try container.decode(TimeInterval.self, forKey: .noiseWindowSec)
+        onConfirmSec = try container.decode(TimeInterval.self, forKey: .onConfirmSec)
+        offConfirmSec = try container.decode(TimeInterval.self, forKey: .offConfirmSec)
+        cooldownSec = try container.decode(TimeInterval.self, forKey: .cooldownSec)
+        minDeltaOn = try container.decode(Double.self, forKey: .minDeltaOn)
+        minDeltaOff = try container.decode(Double.self, forKey: .minDeltaOff)
+        requiredPositiveROICount = try container.decode(Int.self, forKey: .requiredPositiveROICount)
+        noiseMultiplier = try container.decode(Double.self, forKey: .noiseMultiplier)
+        rois = try container.decode([LightROI].self, forKey: .rois)
+    }
+
     static let `default` = LightWatchSettings(
         discordWebhookURL: "",
+        cameraUniqueID: "",
         launchAtLogin: false,
         captureIntervalSec: 1,
         shortDiffSec: 5,
