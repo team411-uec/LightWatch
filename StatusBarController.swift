@@ -121,7 +121,7 @@ final class StatusBarController: NSObject {
         )
         let window = NSWindow(contentViewController: NSHostingController(rootView: view))
         window.title = "LightWatch設定"
-        window.setContentSize(NSSize(width: 560, height: 420))
+        window.setContentSize(NSSize(width: 700, height: 460))
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         window.delegate = self
@@ -190,28 +190,34 @@ private struct SettingsView: View {
     private var generalPane: some View {
         VStack(alignment: .leading, spacing: 18) {
             settingRow("Webhook URL") {
-                TextField("", text: $draft.discordWebhookURL)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 360)
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField("", text: $draft.discordWebhookURL)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 420)
+                    hintText("保存後、次の通知から新しいURLへ送信します。")
+                }
             }
 
             settingRow("カメラ") {
-                HStack(spacing: 8) {
-                    Picker("", selection: $draft.cameraUniqueID) {
-                        Text("システム既定").tag("")
-                        ForEach(cameraOptions) { camera in
-                            Text(camera.name).tag(camera.id)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Picker("", selection: $draft.cameraUniqueID) {
+                            Text("システム既定").tag("")
+                            ForEach(cameraOptions) { camera in
+                                Text(camera.name).tag(camera.id)
+                            }
                         }
-                    }
-                    .labelsHidden()
-                    .frame(width: 260)
+                        .labelsHidden()
+                        .frame(width: 300)
 
-                    Button {
-                        cameraOptions = CameraDeviceCatalog.availableOptions()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
+                        Button {
+                            cameraOptions = CameraDeviceCatalog.availableOptions()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .help("カメラ一覧を再読み込み")
                     }
-                    .help("カメラ一覧を再読み込み")
+                    hintText("SplitCamなどの仮想カメラは起動後に再読み込みします。")
                 }
             }
 
@@ -221,6 +227,8 @@ private struct SettingsView: View {
             Toggle("ログイン時に起動", isOn: $draft.launchAtLogin)
                 .toggleStyle(.checkbox)
                 .padding(.leading, 124)
+            hintText("Mac miniで常駐させる場合は有効にします。")
+                .padding(.leading, 124)
 
             Spacer()
         }
@@ -229,20 +237,20 @@ private struct SettingsView: View {
 
     private var detectionPane: some View {
         VStack(alignment: .leading, spacing: 10) {
-            timeStepper("取得間隔", value: $draft.captureIntervalSec, range: 1...30, step: 1)
-            timeStepper("短期比較", value: $draft.shortDiffSec, range: 1...30, step: 1)
-            timeStepper("ノイズ計測", value: $draft.noiseWindowSec, range: 60...1800, step: 30)
-            timeStepper("ON確認", value: $draft.onConfirmSec, range: 30...900, step: 5)
-            timeStepper("OFF確認", value: $draft.offConfirmSec, range: 300...1800, step: 30)
-            timeStepper("クールダウン", value: $draft.cooldownSec, range: 60...1800, step: 30)
+            timeStepper("取得間隔", value: $draft.captureIntervalSec, range: 1...30, step: 1, hint: "短いほど反応は早く、ログ量は増えます。")
+            timeStepper("短期比較", value: $draft.shortDiffSec, range: 1...30, step: 1, hint: "何秒前の明るさと比べるかです。デバッグ時は短めにします。")
+            timeStepper("ノイズ計測", value: $draft.noiseWindowSec, range: 60...1800, step: 30, hint: "通常の揺れ幅を測る時間です。短いほど環境変化に早く追従します。")
+            timeStepper("ON確認", value: $draft.onConfirmSec, range: 30...900, step: 5, hint: "点灯判定を確定するまでの継続時間です。デバッグ時は30秒にします。")
+            timeStepper("OFF確認", value: $draft.offConfirmSec, range: 300...1800, step: 30, hint: "消灯判定を確定するまでの継続時間です。本番は長めにします。")
+            timeStepper("クールダウン", value: $draft.cooldownSec, range: 60...1800, step: 30, hint: "通知後、次の通知を抑える時間です。デバッグ時は短めにします。")
 
             Divider()
                 .padding(.vertical, 4)
 
-            numberStepper("ON差分しきい値", value: $draft.minDeltaOn, range: 1...80, step: 1, digits: 0)
-            numberStepper("OFF差分しきい値", value: $draft.minDeltaOff, range: -80 ... -1, step: 1, digits: 0)
-            integerStepper("必要positive ROI数", value: $draft.requiredPositiveROICount, range: 1...5, step: 1)
-            numberStepper("ノイズ倍率", value: $draft.noiseMultiplier, range: 1...10, step: 0.5, digits: 1)
+            numberStepper("ON差分しきい値", value: $draft.minDeltaOn, range: 1...80, step: 1, digits: 0, hint: "明るくなったと見る輝度差です。小さいほど検出します。")
+            numberStepper("OFF差分しきい値", value: $draft.minDeltaOff, range: -80 ... -1, step: 1, digits: 0, hint: "暗くなったと見る輝度差です。0に近いほど検出します。")
+            integerStepper("必要positive ROI数", value: $draft.requiredPositiveROICount, range: 1...5, step: 1, hint: "いくつの監視領域が変化したら候補にするかです。")
+            numberStepper("ノイズ倍率", value: $draft.noiseMultiplier, range: 1...10, step: 0.5, digits: 1, hint: "通常の揺れより何倍大きい変化を採用するかです。小さいほど敏感です。")
 
             Spacer()
         }
@@ -250,27 +258,40 @@ private struct SettingsView: View {
     }
 
     private func settingRow<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
+        HStack(alignment: .top, spacing: 16) {
             Text(title)
-                .frame(width: 108, alignment: .trailing)
+                .frame(width: 132, alignment: .trailing)
                 .foregroundStyle(.secondary)
             content()
         }
+    }
+
+    private func hintText(_ text: String) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func timeStepper(
         _ title: String,
         value: Binding<TimeInterval>,
         range: ClosedRange<TimeInterval>,
-        step: TimeInterval
+        step: TimeInterval,
+        hint: String
     ) -> some View {
         settingRow(title) {
-            Stepper(value: value, in: range, step: step) {
-                Text("\(Int(value.wrappedValue))秒")
-                    .monospacedDigit()
-                    .frame(width: 72, alignment: .leading)
+            HStack(alignment: .center, spacing: 16) {
+                Stepper(value: value, in: range, step: step) {
+                    Text("\(Int(value.wrappedValue))秒")
+                        .monospacedDigit()
+                        .frame(width: 72, alignment: .leading)
+                }
+                .frame(width: 150, alignment: .leading)
+
+                hintText(hint)
+                    .frame(width: 330, alignment: .leading)
             }
-            .frame(width: 150, alignment: .leading)
         }
     }
 
@@ -279,15 +300,21 @@ private struct SettingsView: View {
         value: Binding<Double>,
         range: ClosedRange<Double>,
         step: Double,
-        digits: Int
+        digits: Int,
+        hint: String
     ) -> some View {
         settingRow(title) {
-            Stepper(value: value, in: range, step: step) {
-                Text(value.wrappedValue.formatted(.number.precision(.fractionLength(digits))))
-                    .monospacedDigit()
-                    .frame(width: 72, alignment: .leading)
+            HStack(alignment: .center, spacing: 16) {
+                Stepper(value: value, in: range, step: step) {
+                    Text(value.wrappedValue.formatted(.number.precision(.fractionLength(digits))))
+                        .monospacedDigit()
+                        .frame(width: 72, alignment: .leading)
+                }
+                .frame(width: 150, alignment: .leading)
+
+                hintText(hint)
+                    .frame(width: 330, alignment: .leading)
             }
-            .frame(width: 150, alignment: .leading)
         }
     }
 
@@ -295,15 +322,21 @@ private struct SettingsView: View {
         _ title: String,
         value: Binding<Int>,
         range: ClosedRange<Int>,
-        step: Int
+        step: Int,
+        hint: String
     ) -> some View {
         settingRow(title) {
-            Stepper(value: value, in: range, step: step) {
-                Text("\(value.wrappedValue)")
-                    .monospacedDigit()
-                    .frame(width: 72, alignment: .leading)
+            HStack(alignment: .center, spacing: 16) {
+                Stepper(value: value, in: range, step: step) {
+                    Text("\(value.wrappedValue)")
+                        .monospacedDigit()
+                        .frame(width: 72, alignment: .leading)
+                }
+                .frame(width: 150, alignment: .leading)
+
+                hintText(hint)
+                    .frame(width: 330, alignment: .leading)
             }
-            .frame(width: 150, alignment: .leading)
         }
     }
 
