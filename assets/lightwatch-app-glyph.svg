@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="LightWatch bulb glyph">
+  <defs>
+    <linearGradient id="bulb" x1="318" y1="220" x2="706" y2="812" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff5bf"/>
+      <stop offset="0.54" stop-color="#ffd761"/>
+      <stop offset="1" stop-color="#ff9f34"/>
+    </linearGradient>
+  </defs>
+
+  <g fill="none" stroke="#ffe89a" stroke-width="46" stroke-linecap="round" opacity="0.88">
+    <path d="M512 128v76"/>
+    <path d="M290 214l54 54"/>
+    <path d="M734 214l-54 54"/>
+    <path d="M202 432h76"/>
+    <path d="M746 432h76"/>
+  </g>
+
+  <path
+    fill="url(#bulb)"
+    d="M512 214c-132 0-238 102-238 228 0 76 37 139 91 184 44 36 68 78 68 134v7h158v-7c0-56 24-98 68-134 54-45 91-108 91-184 0-126-106-228-238-228Z"/>
+  <path
+    fill="#fff9dc"
+    opacity="0.72"
+    d="M408 412c0-58 47-105 104-105 15 0 26-12 26-26s-11-26-26-26c-86 0-156 70-156 157 0 15 12 26 26 26s26-11 26-26Z"/>
+  <path
+    fill="#27342e"
+    d="M421 748h182c13 0 24 11 24 24s-11 24-24 24H421c-13 0-24-11-24-24s11-24 24-24Z"/>
+  <path
+    fill="#27342e"
+    d="M435 818h154c12 0 22 10 22 22s-10 22-22 22H435c-12 0-22-10-22-22s10-22 22-22Z"/>
+  <path
+    fill="#27342e"
+    d="M473 882h78c11 0 20 9 20 20s-9 20-20 20h-78c-11 0-20-9-20-20s9-20 20-20Z"/>
+  <circle cx="700" cy="322" r="70" fill="#36df6d"/>
+  <circle cx="700" cy="322" r="27" fill="#f7fff9"/>
+</svg>
