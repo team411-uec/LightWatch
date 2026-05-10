@@ -1,0 +1,14 @@
+name: ci
+
+on:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    name: macOS
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build app bundle
+        run: ./installer/macos/build-app.sh 0.0.0-ci

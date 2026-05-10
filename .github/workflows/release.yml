@@ -1,0 +1,55 @@
+name: build-release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "release version without leading v"
+        required: true
+        default: "0.0.0-manual"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (macOS)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+            version="${tag#v}"
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build macOS app bundle
+        run: ./installer/macos/build-app.sh "${{ steps.version.outputs.value }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          gh release view "v${{ steps.version.outputs.value }}" ||
+          gh release create
+          "v${{ steps.version.outputs.value }}"
+          --title "v${{ steps.version.outputs.value }}"
+
+      - name: Upload macOS artifact to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          gh release upload
+          "v${{ steps.version.outputs.value }}"
+          "dist/LightWatch-macOS-${{ steps.version.outputs.value }}.dmg"
+          --clobber
