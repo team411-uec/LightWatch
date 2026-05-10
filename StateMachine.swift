@@ -86,7 +86,7 @@ final class StateMachine {
             eventName: "notify_on",
             title: "照明変化を検出しました",
             state: .bright,
-            reason: "複数ROIの輝度上昇が60秒継続",
+            reason: "複数ROIの輝度上昇が\(Int(settings.onConfirmSec))秒継続",
             confirmSeconds: Int(settings.onConfirmSec)
         )
         return [
@@ -150,7 +150,7 @@ final class StateMachine {
             eventName: "notify_off",
             title: "使用状態の明るさが消えました",
             state: .dark,
-            reason: "複数ROIの輝度低下が10分継続",
+            reason: "複数ROIの輝度低下が\(Int(settings.offConfirmSec))秒継続",
             confirmSeconds: Int(settings.offConfirmSec)
         )
         return [

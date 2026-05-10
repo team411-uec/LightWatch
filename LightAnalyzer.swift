@@ -94,7 +94,7 @@ final class LightAnalyzer {
     }
 
     private func median(from histogram: [Int], sampleCount: Int) -> Double {
-        let midpoint = sampleCount / 2
+        let midpoint = (sampleCount + 1) / 2
         var running = 0
         for (luma, count) in histogram.enumerated() {
             running += count

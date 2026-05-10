@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             self.statusBarController = statusBarController
 
+            logWebhookConfigurationIfNeeded(settings)
             startPowerAssertion()
             startCamera()
         } catch {
@@ -118,9 +119,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applySettings(_ updatedSettings: LightWatchSettings) {
         settings = updatedSettings
         settingsStore.save(settings)
+        logWebhookConfigurationIfNeeded(updatedSettings)
         analyzer = LightAnalyzer(settings: updatedSettings)
         stateMachine?.update(settings: updatedSettings)
         cameraManager?.update(captureInterval: updatedSettings.captureIntervalSec)
+    }
+
+    private func logWebhookConfigurationIfNeeded(_ settings: LightWatchSettings) {
+        guard settings.discordWebhookURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+        logger?.logError("Discord Webhook URLが未設定です。通知は送信されません。")
     }
 
     private func startPowerAssertion() {
