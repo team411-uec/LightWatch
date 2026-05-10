@@ -118,31 +118,30 @@ extension StatusBarController: NSWindowDelegate {
 
 private struct SettingsView: View {
     @State private var draft: LightWatchSettings
-    @State private var launchAtLogin: Bool
+    @State private var errorMessage: String?
     let onSave: (LightWatchSettings) -> Void
 
     init(settings: LightWatchSettings, onSave: @escaping (LightWatchSettings) -> Void) {
         _draft = State(initialValue: settings)
-        _launchAtLogin = State(initialValue: settings.launchAtLogin)
         self.onSave = onSave
     }
 
     var body: some View {
         Form {
             TextField("Discord Webhook URL", text: $draft.discordWebhookURL)
-            Toggle("ログイン時に起動", isOn: $launchAtLogin)
-                .onChange(of: launchAtLogin) { value in
-                    setLaunchAtLogin(value)
-                    draft.launchAtLogin = value
-                }
+            Toggle("ログイン時に起動", isOn: $draft.launchAtLogin)
             Stepper("ON確認秒数: \(draft.onConfirmSec)", value: $draft.onConfirmSec, in: 30...900, step: 5)
             Stepper("OFF確認秒数: \(draft.offConfirmSec)", value: $draft.offConfirmSec, in: 300...1800, step: 30)
             Stepper("クールダウン秒数: \(draft.cooldownSec)", value: $draft.cooldownSec, in: 60...1800, step: 30)
             Stepper("必要positive ROI数: \(draft.requiredPositiveROICount)", value: $draft.requiredPositiveROICount, in: 1...5)
+            if let errorMessage {
+                Text(errorMessage)
+                    .foregroundStyle(.red)
+            }
             HStack {
                 Spacer()
                 Button("保存") {
-                    onSave(draft)
+                    save()
                 }
                 .keyboardShortcut(.defaultAction)
             }
@@ -150,16 +149,25 @@ private struct SettingsView: View {
         .padding(20)
     }
 
-    private func setLaunchAtLogin(_ enabled: Bool) {
+    private func save() {
         do {
-            if enabled {
+            try setLaunchAtLogin(draft.launchAtLogin)
+            errorMessage = nil
+            onSave(draft)
+        } catch {
+            errorMessage = "ログイン項目設定に失敗しました: \(error.localizedDescription)"
+        }
+    }
+
+    private func setLaunchAtLogin(_ enabled: Bool) throws {
+        if enabled {
+            if SMAppService.mainApp.status != .enabled {
                 try SMAppService.mainApp.register()
-            } else {
+            }
+        } else {
+            if SMAppService.mainApp.status == .enabled {
                 try SMAppService.mainApp.unregister()
             }
-        } catch {
-            launchAtLogin.toggle()
-            draft.launchAtLogin = launchAtLogin
         }
     }
 }
