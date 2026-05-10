@@ -146,6 +146,8 @@ private struct SettingsView: View {
     @State private var numberFields: SettingsNumberFields
     @State private var cameraOptions: [CameraDeviceOption]
     @State private var errorMessage: String?
+    @State private var selectedTab = SettingsTab.general
+    @State private var selectedPresetID = DetectionPreset.standard.id
     let onSave: (LightWatchSettings) -> Void
 
     init(settings: LightWatchSettings, onSave: @escaping (LightWatchSettings) -> Void) {
@@ -157,17 +159,28 @@ private struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TabView {
-                generalPane
-                    .tabItem {
-                        Label("一般", systemImage: "gearshape")
-                    }
-                detectionPane
-                    .tabItem {
-                        Label("判定", systemImage: "slider.horizontal.3")
-                    }
+            Picker("", selection: $selectedTab) {
+                Text("一般").tag(SettingsTab.general)
+                Text("判定").tag(SettingsTab.detection)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 204)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
+
+            Divider()
+
+            Group {
+                switch selectedTab {
+                case .general:
+                    generalPane
+                case .detection:
+                    detectionPane
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Color(nsColor: .controlBackgroundColor))
 
             Divider()
 
@@ -187,6 +200,7 @@ private struct SettingsView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
         }
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var generalPane: some View {
@@ -235,10 +249,16 @@ private struct SettingsView: View {
             Spacer()
         }
         .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var detectionPane: some View {
         VStack(alignment: .leading, spacing: 10) {
+            presetRow
+
+            Divider()
+                .padding(.vertical, 4)
+
             numberField("取得間隔", text: $numberFields.captureIntervalSec, suffix: "秒", hint: "短いほど反応は早く、ログ量は増えます。")
             numberField("短期比較", text: $numberFields.shortDiffSec, suffix: "秒", hint: "何秒前の明るさと比べるかです。短いほど直近の変化を見ます。")
             numberField("ノイズ計測", text: $numberFields.noiseWindowSec, suffix: "秒", hint: "通常の揺れ幅を測る時間です。短いほど環境変化に早く追従します。")
@@ -256,7 +276,10 @@ private struct SettingsView: View {
 
             Spacer()
         }
-        .padding(24)
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
+        .padding(.bottom, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func settingRow<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -265,6 +288,28 @@ private struct SettingsView: View {
                 .frame(width: 132, alignment: .trailing)
                 .foregroundStyle(.secondary)
             content()
+        }
+    }
+
+    private var presetRow: some View {
+        settingRow("プリセット") {
+            VStack(alignment: .leading, spacing: 4) {
+                Picker("", selection: $selectedPresetID) {
+                    ForEach(DetectionPreset.presets) { preset in
+                        Text(preset.name).tag(preset.id)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 420)
+                .onChange(of: selectedPresetID) { presetID in
+                    applyPreset(id: presetID)
+                }
+
+                if let preset = DetectionPreset.find(id: selectedPresetID) {
+                    hintText(preset.hint)
+                }
+            }
         }
     }
 
@@ -301,12 +346,22 @@ private struct SettingsView: View {
         }
     }
 
+    private func applyPreset(id: String) {
+        guard let preset = DetectionPreset.find(id: id) else {
+            return
+        }
+        numberFields = preset.numberFields
+        errorMessage = nil
+    }
+
     private func save() {
         do {
             draft = try numberFields.applied(to: draft)
             try setLaunchAtLogin(draft.launchAtLogin)
             errorMessage = nil
             onSave(draft)
+        } catch let error as SettingsValidationError {
+            errorMessage = error.localizedDescription
         } catch {
             errorMessage = "ログイン項目設定に失敗しました: \(error.localizedDescription)"
         }
@@ -325,90 +380,7 @@ private struct SettingsView: View {
     }
 }
 
-private struct SettingsNumberFields {
-    var captureIntervalSec: String
-    var shortDiffSec: String
-    var noiseWindowSec: String
-    var onConfirmSec: String
-    var offConfirmSec: String
-    var cooldownSec: String
-    var minDeltaOn: String
-    var minDeltaOff: String
-    var requiredPositiveROICount: String
-    var noiseMultiplier: String
-
-    init(settings: LightWatchSettings) {
-        captureIntervalSec = Self.integerString(settings.captureIntervalSec)
-        shortDiffSec = Self.integerString(settings.shortDiffSec)
-        noiseWindowSec = Self.integerString(settings.noiseWindowSec)
-        onConfirmSec = Self.integerString(settings.onConfirmSec)
-        offConfirmSec = Self.integerString(settings.offConfirmSec)
-        cooldownSec = Self.integerString(settings.cooldownSec)
-        minDeltaOn = Self.integerString(settings.minDeltaOn)
-        minDeltaOff = Self.integerString(settings.minDeltaOff)
-        requiredPositiveROICount = String(settings.requiredPositiveROICount)
-        noiseMultiplier = settings.noiseMultiplier.formatted(.number.precision(.fractionLength(1)))
-    }
-
-    func applied(to settings: LightWatchSettings) throws -> LightWatchSettings {
-        var updatedSettings = settings
-        updatedSettings.captureIntervalSec = try validatedDouble(captureIntervalSec, name: "取得間隔", range: 1...30)
-        updatedSettings.shortDiffSec = try validatedDouble(shortDiffSec, name: "短期比較", range: 1...30)
-        updatedSettings.noiseWindowSec = try validatedDouble(noiseWindowSec, name: "ノイズ計測", range: 60...1800)
-        updatedSettings.onConfirmSec = try validatedDouble(onConfirmSec, name: "ON確認", range: 30...900)
-        updatedSettings.offConfirmSec = try validatedDouble(offConfirmSec, name: "OFF確認", range: 300...1800)
-        updatedSettings.cooldownSec = try validatedDouble(cooldownSec, name: "クールダウン", range: 60...1800)
-        updatedSettings.minDeltaOn = try validatedDouble(minDeltaOn, name: "ON差分しきい値", range: 1...80)
-        updatedSettings.minDeltaOff = try validatedDouble(minDeltaOff, name: "OFF差分しきい値", range: -80 ... -1)
-        updatedSettings.requiredPositiveROICount = try validatedInt(requiredPositiveROICount, name: "必要positive ROI数", range: 1...5)
-        updatedSettings.noiseMultiplier = try validatedDouble(noiseMultiplier, name: "ノイズ倍率", range: 1...10)
-        return updatedSettings
-    }
-
-    private static func integerString(_ value: Double) -> String {
-        String(Int(value))
-    }
-
-    private func validatedDouble(_ text: String, name: String, range: ClosedRange<Double>) throws -> Double {
-        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let value = Double(trimmedText), value.isFinite else {
-            throw SettingsValidationError.invalidNumber(name)
-        }
-        guard range.contains(value) else {
-            throw SettingsValidationError.outOfRange(name, lower: range.lowerBound, upper: range.upperBound)
-        }
-        return value
-    }
-
-    private func validatedInt(_ text: String, name: String, range: ClosedRange<Int>) throws -> Int {
-        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let value = Int(trimmedText) else {
-            throw SettingsValidationError.invalidNumber(name)
-        }
-        guard range.contains(value) else {
-            throw SettingsValidationError.outOfRange(name, lower: Double(range.lowerBound), upper: Double(range.upperBound))
-        }
-        return value
-    }
-}
-
-private enum SettingsValidationError: LocalizedError {
-    case invalidNumber(String)
-    case outOfRange(String, lower: Double, upper: Double)
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidNumber(let name):
-            return "\(name)は数値で入力してください。"
-        case .outOfRange(let name, let lower, let upper):
-            return "\(name)は\(format(lower))から\(format(upper))の範囲で入力してください。"
-        }
-    }
-
-    private func format(_ value: Double) -> String {
-        if value.rounded() == value {
-            return String(Int(value))
-        }
-        return value.formatted(.number.precision(.fractionLength(1)))
-    }
+private enum SettingsTab {
+    case general
+    case detection
 }
