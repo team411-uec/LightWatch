@@ -50,6 +50,9 @@ final class StateMachine {
     }
 
     private func handleDark(_ snapshot: LightAnalysisSnapshot) -> [LightEvent] {
+        guard !isPersonPresent(snapshot) else {
+            return startOnCandidate(snapshot)
+        }
         guard isObservable(snapshot) else {
             return []
         }
@@ -61,6 +64,9 @@ final class StateMachine {
     }
 
     private func handleOnCandidate(_ snapshot: LightAnalysisSnapshot) -> [LightEvent] {
+        guard !isPersonPresent(snapshot) else {
+            return confirmOnIfElapsed(snapshot)
+        }
         guard isObservable(snapshot) else {
             candidateStartedAt = snapshot.timestamp
             return []
@@ -72,30 +78,14 @@ final class StateMachine {
             return [LightEvent(event: "on_candidate_cancelled", state: currentState.rawValue, reason: "signal_lost", values: [:])]
         }
 
-        guard let candidateStartedAt else {
-            self.candidateStartedAt = snapshot.timestamp
-            return []
-        }
-
-        let elapsed = snapshot.timestamp.timeIntervalSince(candidateStartedAt)
-        guard elapsed >= effectiveOnConfirmSec else {
-            return []
-        }
-
-        currentState = .bright
-        stableReferenceMedian = snapshot.sceneLevel.positiveMedian
-        clearCandidate()
-        let notification = DiscordNotification(
-            eventName: "notify_on",
-            title: "🟢人がいます",
-            state: .bright,
-            reason: "監視領域の明るい状態が\(Int(effectiveOnConfirmSec))秒継続",
-            confirmSeconds: Int(effectiveOnConfirmSec)
-        )
-        return [makeNotificationEvent(notification)]
+        return confirmOnIfElapsed(snapshot)
     }
 
     private func handleBright(_ snapshot: LightAnalysisSnapshot) -> [LightEvent] {
+        guard !isPersonPresent(snapshot) else {
+            clearCandidate()
+            return []
+        }
         guard isObservable(snapshot) else {
             return []
         }
@@ -107,6 +97,11 @@ final class StateMachine {
     }
 
     private func handleOffCandidate(_ snapshot: LightAnalysisSnapshot) -> [LightEvent] {
+        guard !isPersonPresent(snapshot) else {
+            currentState = .bright
+            clearCandidate()
+            return [LightEvent(event: "off_candidate_cancelled", state: currentState.rawValue, reason: "person_present", values: numericValues(snapshot.sceneLevel.values))]
+        }
         guard isObservable(snapshot) else {
             candidateStartedAt = snapshot.timestamp
             return []
@@ -141,6 +136,30 @@ final class StateMachine {
         return [makeNotificationEvent(notification)]
     }
 
+    private func confirmOnIfElapsed(_ snapshot: LightAnalysisSnapshot) -> [LightEvent] {
+        guard let candidateStartedAt else {
+            self.candidateStartedAt = snapshot.timestamp
+            return []
+        }
+
+        let elapsed = snapshot.timestamp.timeIntervalSince(candidateStartedAt)
+        guard elapsed >= effectiveOnConfirmSec else {
+            return []
+        }
+
+        currentState = .bright
+        stableReferenceMedian = snapshot.sceneLevel.positiveMedian
+        clearCandidate()
+        let notification = DiscordNotification(
+            eventName: "notify_on",
+            title: "🟢人がいます",
+            state: .bright,
+            reason: "人物または監視領域の明るい状態が\(Int(effectiveOnConfirmSec))秒継続",
+            confirmSeconds: Int(effectiveOnConfirmSec)
+        )
+        return [makeNotificationEvent(notification)]
+    }
+
     private func startOnCandidate(_ snapshot: LightAnalysisSnapshot) -> [LightEvent] {
         currentState = .onCandidate
         candidateStartedAt = snapshot.timestamp
@@ -170,6 +189,9 @@ final class StateMachine {
     }
 
     private func isBright(_ snapshot: LightAnalysisSnapshot) -> Bool {
+        if isPersonPresent(snapshot) {
+            return true
+        }
         guard isObservable(snapshot) else {
             return false
         }
@@ -181,6 +203,9 @@ final class StateMachine {
     }
 
     private func isDark(_ snapshot: LightAnalysisSnapshot) -> Bool {
+        guard !isPersonPresent(snapshot) else {
+            return false
+        }
         guard isObservable(snapshot) else {
             return false
         }
@@ -225,6 +250,10 @@ final class StateMachine {
 
     private func isObservable(_ snapshot: LightAnalysisSnapshot) -> Bool {
         snapshot.sceneLevel.observablePositiveCount >= max(3, settings.requiredPositiveROICount)
+    }
+
+    private func isPersonPresent(_ snapshot: LightAnalysisSnapshot) -> Bool {
+        snapshot.sceneLevel.isPersonPresent
     }
 
     private func clearCandidate() {

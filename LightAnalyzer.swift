@@ -26,6 +26,7 @@ final class LightAnalyzer {
 
         let timestamp = Date()
         let personMask = try makePersonMask(pixelBuffer: pixelBuffer)
+        let personPresence = try analyzePersonPresence(personMask: personMask)
         let roiStats = try rois.map { roi in
             try analyzeROI(roi, pixelBuffer: pixelBuffer, personMask: personMask)
         }
@@ -35,7 +36,7 @@ final class LightAnalyzer {
             timestamp: timestamp,
             state: state,
             roiStats: roiStats,
-            sceneLevel: LightSceneLevel(currentStats: roiStats)
+            sceneLevel: LightSceneLevel(currentStats: roiStats, personPresence: personPresence)
         )
         return snapshot
     }
@@ -47,6 +48,45 @@ final class LightAnalyzer {
         } catch {
             throw LightAnalyzerError.personSegmentationFailed(error.localizedDescription)
         }
+    }
+
+    private func analyzePersonPresence(personMask: CVPixelBuffer?) throws -> PersonPresence {
+        guard let personMask else {
+            return PersonPresence(maskedRatio: 0)
+        }
+
+        CVPixelBufferLockBaseAddress(personMask, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(personMask, .readOnly) }
+
+        guard let baseAddress = CVPixelBufferGetBaseAddress(personMask) else {
+            throw LightAnalyzerError.missingPixelBuffer
+        }
+
+        let width = CVPixelBufferGetWidth(personMask)
+        let height = CVPixelBufferGetHeight(personMask)
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(personMask)
+        let pointer = baseAddress.assumingMemoryBound(to: UInt8.self)
+        let step = max(1, min(width, height) / 120)
+
+        var personCount = 0
+        var sampleCount = 0
+        var y = 0
+        while y < height {
+            var x = 0
+            while x < width {
+                if Int(pointer[y * bytesPerRow + x]) >= personMaskThreshold {
+                    personCount += 1
+                }
+                sampleCount += 1
+                x += step
+            }
+            y += step
+        }
+
+        guard sampleCount > 0 else {
+            return PersonPresence(maskedRatio: 0)
+        }
+        return PersonPresence(maskedRatio: Double(personCount) / Double(sampleCount))
     }
 
     private func analyzeROI(_ roi: LightROI, pixelBuffer: CVPixelBuffer, personMask: CVPixelBuffer?) throws -> ROIStats {
@@ -227,6 +267,14 @@ struct ROIStats {
     let isDark: Bool
 }
 
+struct PersonPresence {
+    let maskedRatio: Double
+
+    var isPresent: Bool {
+        maskedRatio >= 0.02
+    }
+}
+
 struct LightSceneLevel {
     let positiveMedian: Double
     let guardMedian: Double?
@@ -234,9 +282,11 @@ struct LightSceneLevel {
     let positiveBrightRatio: Double
     let observablePositiveCount: Int
     let isObservable: Bool
+    let personMaskedRatio: Double
+    let isPersonPresent: Bool
     let positiveROINames: [String]
 
-    init(currentStats: [ROIStats]) {
+    init(currentStats: [ROIStats], personPresence: PersonPresence) {
         let positiveStats = currentStats.filter { $0.kind == .positive && $0.isObservable }
         let guardStats = currentStats.filter { $0.kind == .negative && $0.isObservable }
         positiveMedian = Self.median(positiveStats.map(\.medianLuma))
@@ -245,6 +295,8 @@ struct LightSceneLevel {
         positiveBrightRatio = Self.average(positiveStats.map(\.brightRatio))
         observablePositiveCount = positiveStats.count
         isObservable = positiveStats.count >= 3
+        personMaskedRatio = personPresence.maskedRatio
+        isPersonPresent = personPresence.isPresent
         positiveROINames = positiveStats.map(\.name)
     }
 
@@ -253,7 +305,8 @@ struct LightSceneLevel {
             "positive_median": positiveMedian,
             "positive_dark_ratio": positiveDarkRatio,
             "positive_bright_ratio": positiveBrightRatio,
-            "observable_positive_count": Double(observablePositiveCount)
+            "observable_positive_count": Double(observablePositiveCount),
+            "person_masked_ratio": personMaskedRatio
         ]
         if let guardMedian {
             values["guard_median"] = guardMedian
