@@ -116,10 +116,8 @@ final class LightAnalyzer {
             }
             let delta = current.medianLuma - old.medianLuma
             let brightDelta = current.brightRatio - old.brightRatio
-            let normalNoise = normalNoiseForROI(named: current.name)
             return delta >= settings.minDeltaOn
                 && brightDelta > 0
-                && delta >= max(settings.minDeltaOn, normalNoise * settings.noiseMultiplier)
         }
 
         guard changed.count >= settings.requiredPositiveROICount else {
@@ -157,16 +155,6 @@ final class LightAnalyzer {
         }
     }
 
-    private func normalNoiseForROI(named roiName: String) -> Double {
-        let values = history.compactMap { $0.stat(named: roiName)?.medianLuma }
-        guard values.count >= 2 else {
-            return 0
-        }
-        let minValue = values.min() ?? 0
-        let maxValue = values.max() ?? 0
-        return maxValue - minValue
-    }
-
     private func deltas(for changedStats: [ROIStats], from previous: LightAnalysisSnapshot) -> [String: Double] {
         Dictionary(uniqueKeysWithValues: changedStats.compactMap { current in
             guard let old = previous.stat(named: current.name) else {
@@ -177,7 +165,7 @@ final class LightAnalyzer {
     }
 
     private func trimHistory(now: Date) {
-        let lowerBound = now.addingTimeInterval(-(settings.noiseWindowSec + settings.shortDiffSec + 10))
+        let lowerBound = now.addingTimeInterval(-(settings.shortDiffSec + 10))
         history.removeAll { $0.timestamp < lowerBound }
     }
 }

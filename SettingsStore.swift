@@ -26,7 +26,9 @@ final class SettingsStore {
             return settings
         }
         let data = try Data(contentsOf: configURL)
-        return try decoder.decode(LightWatchSettings.self, from: data)
+        let settings = try decoder.decode(LightWatchSettings.self, from: data)
+        save(settings)
+        return settings
     }
 
     func save(_ settings: LightWatchSettings) {
@@ -71,14 +73,11 @@ struct LightWatchSettings: Codable, Equatable {
     var launchAtLogin: Bool
     var captureIntervalSec: TimeInterval
     var shortDiffSec: TimeInterval
-    var noiseWindowSec: TimeInterval
     var onConfirmSec: TimeInterval
     var offConfirmSec: TimeInterval
-    var cooldownSec: TimeInterval
     var minDeltaOn: Double
     var minDeltaOff: Double
     var requiredPositiveROICount: Int
-    var noiseMultiplier: Double
     var rois: [LightROI]
 
     enum CodingKeys: String, CodingKey {
@@ -87,14 +86,11 @@ struct LightWatchSettings: Codable, Equatable {
         case launchAtLogin
         case captureIntervalSec
         case shortDiffSec
-        case noiseWindowSec
         case onConfirmSec
         case offConfirmSec
-        case cooldownSec
         case minDeltaOn
         case minDeltaOff
         case requiredPositiveROICount
-        case noiseMultiplier
         case rois
     }
 
@@ -104,14 +100,11 @@ struct LightWatchSettings: Codable, Equatable {
         launchAtLogin: Bool,
         captureIntervalSec: TimeInterval,
         shortDiffSec: TimeInterval,
-        noiseWindowSec: TimeInterval,
         onConfirmSec: TimeInterval,
         offConfirmSec: TimeInterval,
-        cooldownSec: TimeInterval,
         minDeltaOn: Double,
         minDeltaOff: Double,
         requiredPositiveROICount: Int,
-        noiseMultiplier: Double,
         rois: [LightROI]
     ) {
         self.discordWebhookURL = discordWebhookURL
@@ -119,14 +112,11 @@ struct LightWatchSettings: Codable, Equatable {
         self.launchAtLogin = launchAtLogin
         self.captureIntervalSec = captureIntervalSec
         self.shortDiffSec = shortDiffSec
-        self.noiseWindowSec = noiseWindowSec
         self.onConfirmSec = onConfirmSec
         self.offConfirmSec = offConfirmSec
-        self.cooldownSec = cooldownSec
         self.minDeltaOn = minDeltaOn
         self.minDeltaOff = minDeltaOff
         self.requiredPositiveROICount = requiredPositiveROICount
-        self.noiseMultiplier = noiseMultiplier
         self.rois = rois
     }
 
@@ -137,14 +127,11 @@ struct LightWatchSettings: Codable, Equatable {
         launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)
         captureIntervalSec = try container.decode(TimeInterval.self, forKey: .captureIntervalSec)
         shortDiffSec = try container.decode(TimeInterval.self, forKey: .shortDiffSec)
-        noiseWindowSec = try container.decode(TimeInterval.self, forKey: .noiseWindowSec)
         onConfirmSec = try container.decode(TimeInterval.self, forKey: .onConfirmSec)
         offConfirmSec = try container.decode(TimeInterval.self, forKey: .offConfirmSec)
-        cooldownSec = try container.decode(TimeInterval.self, forKey: .cooldownSec)
         minDeltaOn = try container.decode(Double.self, forKey: .minDeltaOn)
         minDeltaOff = try container.decode(Double.self, forKey: .minDeltaOff)
         requiredPositiveROICount = try container.decode(Int.self, forKey: .requiredPositiveROICount)
-        noiseMultiplier = try container.decode(Double.self, forKey: .noiseMultiplier)
         rois = try container.decode([LightROI].self, forKey: .rois)
     }
 
@@ -154,14 +141,11 @@ struct LightWatchSettings: Codable, Equatable {
         launchAtLogin: false,
         captureIntervalSec: 1,
         shortDiffSec: 5,
-        noiseWindowSec: 300,
         onConfirmSec: 60,
         offConfirmSec: 600,
-        cooldownSec: 600,
         minDeltaOn: 18,
         minDeltaOff: -18,
         requiredPositiveROICount: 2,
-        noiseMultiplier: 5.0,
         rois: [
             LightROI(name: "wall", kind: .positive, x: 0.05, y: 0.10, width: 0.35, height: 0.35),
             LightROI(name: "desk", kind: .positive, x: 0.25, y: 0.55, width: 0.35, height: 0.30),

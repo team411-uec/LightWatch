@@ -12,9 +12,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cameraManager: CameraManager?
     private var statusBarController: StatusBarController?
     private var powerAssertionID = IOPMAssertionID(0)
-    private var lastNotificationSentAt: Date?
-    private var pendingNotificationWorkItem: DispatchWorkItem?
-    private var pendingNotificationState: LightWatchState?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -51,7 +48,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        pendingNotificationWorkItem?.cancel()
         cameraManager?.stop()
         stopPowerAssertion()
         if let stateMachine {
@@ -82,14 +78,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             let transitionEvents = stateMachine.handle(snapshot: snapshot)
             settingsStore.saveState(stateMachine.currentState)
-            cancelPendingNotificationIfStateChanged(stateMachine.currentState)
             DispatchQueue.main.async { [weak self] in
                 self?.statusBarController?.update(state: stateMachine.currentState)
             }
 
             for event in transitionEvents {
                 if let notification = event.notification {
-                    sendOrSchedule(notification)
+                    send(notification)
                 }
             }
         } catch {
@@ -98,9 +93,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func pauseMonitoring() {
-        pendingNotificationWorkItem?.cancel()
-        pendingNotificationWorkItem = nil
-        pendingNotificationState = nil
         cameraManager?.stop()
         stopPowerAssertion()
         DispatchQueue.main.async { [weak self] in
@@ -156,49 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         powerAssertionID = 0
     }
 
-    private func sendOrSchedule(_ notification: DiscordNotification) {
-        pendingNotificationWorkItem?.cancel()
-        pendingNotificationWorkItem = nil
-        pendingNotificationState = nil
-
-        let now = Date()
-        let remainingCooldown = lastNotificationSentAt.map {
-            settings.cooldownSec - now.timeIntervalSince($0)
-        } ?? 0
-
-        guard remainingCooldown > 0 else {
-            send(notification)
-            return
-        }
-
-        pendingNotificationState = notification.state
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            guard self.stateMachine?.currentState == notification.state else {
-                self.pendingNotificationState = nil
-                return
-            }
-            self.pendingNotificationState = nil
-            self.send(notification)
-        }
-        pendingNotificationWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + remainingCooldown, execute: workItem)
-    }
-
-    private func cancelPendingNotificationIfStateChanged(_ currentState: LightWatchState) {
-        guard let pendingNotificationState else {
-            return
-        }
-        guard pendingNotificationState != currentState else {
-            return
-        }
-        pendingNotificationWorkItem?.cancel()
-        pendingNotificationWorkItem = nil
-        self.pendingNotificationState = nil
-    }
-
     private func send(_ notification: DiscordNotification) {
-        lastNotificationSentAt = Date()
         webhookClient?.send(notification: notification) { [weak self] result in
             switch result {
             case .success:

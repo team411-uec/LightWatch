@@ -261,10 +261,8 @@ private struct SettingsView: View {
 
             numberField("取得間隔", text: $numberFields.captureIntervalSec, suffix: "秒", hint: "短いほど反応は早く、ログ量は増えます。")
             numberField("短期比較", text: $numberFields.shortDiffSec, suffix: "秒", hint: "何秒前の明るさと比べるかです。短いほど直近の変化を見ます。")
-            numberField("ノイズ計測", text: $numberFields.noiseWindowSec, suffix: "秒", hint: "通常の揺れ幅を測る時間です。短いほど環境変化に早く追従します。")
             numberField("ON確認", text: $numberFields.onConfirmSec, suffix: "秒", hint: "点灯判定を確定するまでの継続時間です。短いほど早く確定します。")
             numberField("OFF確認", text: $numberFields.offConfirmSec, suffix: "秒", hint: "消灯判定を確定するまでの継続時間です。長いほど誤検出を抑えます。")
-            numberField("クールダウン", text: $numberFields.cooldownSec, suffix: "秒", hint: "通知後、次の通知を抑える時間です。短いほど再通知が早くなります。")
 
             Divider()
                 .padding(.vertical, 4)
@@ -272,7 +270,6 @@ private struct SettingsView: View {
             numberField("ON差分しきい値", text: $numberFields.minDeltaOn, suffix: "", hint: "明るくなったと見る輝度差です。小さいほど検出します。")
             numberField("OFF差分しきい値", text: $numberFields.minDeltaOff, suffix: "", hint: "暗くなったと見る輝度差です。0に近いほど検出します。")
             numberField("必要positive ROI数", text: $numberFields.requiredPositiveROICount, suffix: "", hint: "いくつの監視領域が変化したら候補にするかです。")
-            numberField("ノイズ倍率", text: $numberFields.noiseMultiplier, suffix: "", hint: "通常の揺れより何倍大きい変化を採用するかです。小さいほど敏感です。")
 
             Spacer()
         }
