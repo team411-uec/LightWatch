@@ -26,7 +26,7 @@ final class SettingsStore {
             return settings
         }
         let data = try Data(contentsOf: configURL)
-        let settings = try decoder.decode(LightWatchSettings.self, from: data)
+        let settings = try decoder.decode(LightWatchSettings.self, from: data).normalized()
         save(settings)
         return settings
     }
@@ -150,9 +150,20 @@ struct LightWatchSettings: Codable, Equatable {
             LightROI(name: "topLeftEdge", kind: .positive, x: 0.02, y: 0.02, width: 0.26, height: 0.22),
             LightROI(name: "topRightEdge", kind: .positive, x: 0.72, y: 0.02, width: 0.26, height: 0.22),
             LightROI(name: "bottomLeftEdge", kind: .positive, x: 0.02, y: 0.76, width: 0.26, height: 0.22),
-            LightROI(name: "bottomRightEdge", kind: .positive, x: 0.72, y: 0.76, width: 0.26, height: 0.22)
+            LightROI(name: "bottomRightEdge", kind: .positive, x: 0.72, y: 0.76, width: 0.26, height: 0.22),
+            LightROI(name: "centerLeftGuard", kind: .negative, x: 0.30, y: 0.18, width: 0.16, height: 0.64),
+            LightROI(name: "centerRightGuard", kind: .negative, x: 0.54, y: 0.18, width: 0.16, height: 0.64)
         ]
     )
+
+    func normalized() -> LightWatchSettings {
+        guard !rois.contains(where: { $0.kind == .negative }) else {
+            return self
+        }
+        var settings = self
+        settings.rois.append(contentsOf: Self.default.rois.filter { $0.kind == .negative })
+        return settings
+    }
 }
 
 struct LightROI: Codable, Equatable {

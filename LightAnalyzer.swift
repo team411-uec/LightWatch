@@ -116,25 +116,27 @@ final class LightAnalyzer {
         guard let previous = snapshot(near: timestamp.addingTimeInterval(-settings.shortDiffSec)) else {
             return .none
         }
+        let changeContext = ROIChangeContext(currentStats: currentStats, previousSnapshot: previous)
+        guard !changeContext.hasUnstableGuardROI(threshold: settings.minDeltaOn * 1.5) else {
+            return .none
+        }
 
         let positiveStats = currentStats.filter { $0.kind == .positive }
         let changed = currentStats.filter { current in
             guard current.kind == .positive, let old = previous.stat(named: current.name) else {
                 return false
             }
-            let delta = current.medianLuma - old.medianLuma
-            let brightDelta = current.brightRatio - old.brightRatio
-            let darkDelta = current.darkRatio - old.darkRatio
-            return delta >= settings.minDeltaOn
-                && brightDelta >= 0.03
-                && darkDelta <= -0.03
+            let change = changeContext.change(current: current, old: old)
+            return change.relativeMedianDelta >= settings.minDeltaOn
+                && change.relativeBrightRatioDelta >= 0.03
+                && change.relativeDarkRatioDelta <= -0.03
         }
 
         guard changed.count >= requiredPositiveROICount(availableCount: positiveStats.count) else {
             return .none
         }
 
-        return .changed(roiNames: changed.map(\.name), deltas: deltas(for: changed, from: previous))
+        return .changed(roiNames: changed.map(\.name), deltas: deltas(for: changed, from: previous, context: changeContext))
     }
 
     private func makeOffSignal(
@@ -144,25 +146,27 @@ final class LightAnalyzer {
         guard let previous = snapshot(near: timestamp.addingTimeInterval(-settings.shortDiffSec)) else {
             return .none
         }
+        let changeContext = ROIChangeContext(currentStats: currentStats, previousSnapshot: previous)
+        guard !changeContext.hasUnstableGuardROI(threshold: abs(settings.minDeltaOff) * 1.5) else {
+            return .none
+        }
 
         let positiveStats = currentStats.filter { $0.kind == .positive }
         let changed = currentStats.filter { current in
             guard current.kind == .positive, let old = previous.stat(named: current.name) else {
                 return false
             }
-            let delta = current.medianLuma - old.medianLuma
-            let brightDelta = current.brightRatio - old.brightRatio
-            let darkDelta = current.darkRatio - old.darkRatio
-            return delta <= settings.minDeltaOff
-                && brightDelta <= -0.03
-                && darkDelta >= 0.03
+            let change = changeContext.change(current: current, old: old)
+            return change.relativeMedianDelta <= settings.minDeltaOff
+                && change.relativeBrightRatioDelta <= -0.03
+                && change.relativeDarkRatioDelta >= 0.03
         }
 
         guard changed.count >= requiredPositiveROICount(availableCount: positiveStats.count) else {
             return .none
         }
 
-        return .changed(roiNames: changed.map(\.name), deltas: deltas(for: changed, from: previous))
+        return .changed(roiNames: changed.map(\.name), deltas: deltas(for: changed, from: previous, context: changeContext))
     }
 
     private func snapshot(near date: Date) -> LightAnalysisSnapshot? {
@@ -171,12 +175,16 @@ final class LightAnalyzer {
         }
     }
 
-    private func deltas(for changedStats: [ROIStats], from previous: LightAnalysisSnapshot) -> [String: Double] {
+    private func deltas(
+        for changedStats: [ROIStats],
+        from previous: LightAnalysisSnapshot,
+        context: ROIChangeContext
+    ) -> [String: Double] {
         Dictionary(uniqueKeysWithValues: changedStats.compactMap { current in
             guard let old = previous.stat(named: current.name) else {
                 return nil
             }
-            return ("\(current.name)_d5", current.medianLuma - old.medianLuma)
+            return ("\(current.name)_relative_d5", context.change(current: current, old: old).relativeMedianDelta)
         })
     }
 
@@ -223,6 +231,63 @@ struct ROIStats {
     let brightRatio: Double
     let darkRatio: Double
     let isDark: Bool
+}
+
+struct ROIChange {
+    let relativeMedianDelta: Double
+    let relativeBrightRatioDelta: Double
+    let relativeDarkRatioDelta: Double
+}
+
+struct ROIChangeContext {
+    private let guardMedianDelta: Double
+    private let guardBrightRatioDelta: Double
+    private let guardDarkRatioDelta: Double
+    private let guardMedianDeltas: [Double]
+
+    init(currentStats: [ROIStats], previousSnapshot: LightAnalysisSnapshot) {
+        let guardChanges = currentStats.compactMap { current -> (median: Double, bright: Double, dark: Double)? in
+            guard current.kind == .negative, let old = previousSnapshot.stat(named: current.name) else {
+                return nil
+            }
+            return (
+                median: current.medianLuma - old.medianLuma,
+                bright: current.brightRatio - old.brightRatio,
+                dark: current.darkRatio - old.darkRatio
+            )
+        }
+        guardMedianDeltas = guardChanges.map(\.median)
+        guardMedianDelta = Self.median(guardChanges.map(\.median))
+        guardBrightRatioDelta = Self.median(guardChanges.map(\.bright))
+        guardDarkRatioDelta = Self.median(guardChanges.map(\.dark))
+    }
+
+    func change(current: ROIStats, old: ROIStats) -> ROIChange {
+        ROIChange(
+            relativeMedianDelta: current.medianLuma - old.medianLuma - guardMedianDelta,
+            relativeBrightRatioDelta: current.brightRatio - old.brightRatio - guardBrightRatioDelta,
+            relativeDarkRatioDelta: current.darkRatio - old.darkRatio - guardDarkRatioDelta
+        )
+    }
+
+    func hasUnstableGuardROI(threshold: Double) -> Bool {
+        guard guardMedianDeltas.count >= 2 else {
+            return false
+        }
+        return guardMedianDeltas.contains { abs($0 - guardMedianDelta) >= threshold }
+    }
+
+    private static func median(_ values: [Double]) -> Double {
+        guard !values.isEmpty else {
+            return 0
+        }
+        let sortedValues = values.sorted()
+        let middleIndex = sortedValues.count / 2
+        if sortedValues.count.isMultiple(of: 2) {
+            return (sortedValues[middleIndex - 1] + sortedValues[middleIndex]) / 2
+        }
+        return sortedValues[middleIndex]
+    }
 }
 
 enum LightSignal {
