@@ -28,6 +28,7 @@ enum LightReferenceProfileError: LocalizedError {
     case emptyEdgeROI
     case missingReference
     case insufficientCommonROI
+    case cameraCovered
 
     var errorDescription: String? {
         switch self {
@@ -39,6 +40,8 @@ enum LightReferenceProfileError: LocalizedError {
             return "消灯基準と点灯基準の両方を保存してください。"
         case .insufficientCommonROI:
             return "基準比較に使える共通ROIが足りません。"
+        case .cameraCovered:
+            return "カメラが覆われています。"
         }
     }
 }
@@ -84,6 +87,9 @@ enum LightSceneClassifier {
 
         let darkDistance = try distance(from: roiStats, to: darkProfile)
         let brightDistance = try distance(from: roiStats, to: brightProfile)
+        guard !isCameraCovered(roiStats: roiStats, darkProfile: darkProfile) else {
+            throw LightReferenceProfileError.cameraCovered
+        }
 
         if brightDistance + margin < darkDistance {
             return LightSceneClassification(
@@ -123,6 +129,31 @@ enum LightSceneClassifier {
         let usableCount = max(1, Int((Double(distances.count) * 0.5).rounded(.up)))
         let usableDistances = distances.prefix(usableCount)
         return usableDistances.reduce(0, +) / Double(usableDistances.count)
+    }
+
+    private static func isCameraCovered(roiStats: [ROIStats], darkProfile: LightReferenceProfile) -> Bool {
+        let statsByName = Dictionary(uniqueKeysWithValues: roiStats.map { ($0.name, $0) })
+        let darkSamples = darkProfile.samples.compactMap { sample -> (current: ROIStats, reference: LightReferenceSample)? in
+            guard let current = statsByName[sample.roiName] else {
+                return nil
+            }
+            return (current, sample)
+        }
+
+        guard !darkSamples.isEmpty else {
+            return false
+        }
+
+        let coveredCount = darkSamples.filter { current, reference in
+            current.medianLuma <= 8
+                || (
+                    current.medianLuma <= reference.medianLuma - 16
+                    && current.darkRatio >= max(0.85, reference.darkRatio + 0.25)
+                    && current.brightRatio <= 0.02
+                )
+        }.count
+
+        return coveredCount * 2 >= darkSamples.count
     }
 }
 

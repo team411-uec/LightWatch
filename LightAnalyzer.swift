@@ -142,6 +142,10 @@ final class LightAnalyzer {
             )
         }
 
+        guard !hasReferenceProfiles else {
+            return .none
+        }
+
         guard let previous = snapshot(near: timestamp.addingTimeInterval(-settings.shortDiffSec)) else {
             return .none
         }
@@ -176,6 +180,10 @@ final class LightAnalyzer {
                     "bright_distance": sceneClassification.brightDistance
                 ]
             )
+        }
+
+        guard !hasReferenceProfiles else {
+            return .none
         }
 
         guard let previous = snapshot(near: timestamp.addingTimeInterval(-settings.shortDiffSec)) else {
@@ -218,6 +226,10 @@ final class LightAnalyzer {
     private func trimHistory(now: Date) {
         let lowerBound = now.addingTimeInterval(-(settings.shortDiffSec + 10))
         history.removeAll { $0.timestamp < lowerBound }
+    }
+
+    private var hasReferenceProfiles: Bool {
+        settings.darkReferenceProfile != nil && settings.brightReferenceProfile != nil
     }
 }
 
