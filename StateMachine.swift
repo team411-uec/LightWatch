@@ -5,6 +5,19 @@ enum LightWatchState: String, Codable {
     case onCandidate = "ON_CANDIDATE"
     case bright = "BRIGHT"
     case offCandidate = "OFF_CANDIDATE"
+
+    var displayName: String {
+        switch self {
+        case .dark:
+            return "消灯中"
+        case .onCandidate:
+            return "点灯確認中"
+        case .bright:
+            return "点灯中"
+        case .offCandidate:
+            return "消灯確認中"
+        }
+    }
 }
 
 final class StateMachine {

@@ -12,7 +12,7 @@ final class StatusBarController: NSObject {
     private let logsDirectory: URL
     private var currentSettings: LightWatchSettings
     private var settingsWindow: NSWindow?
-    private let stateMenuItem = NSMenuItem(title: "現在状態: DARK", action: nil, keyEquivalent: "")
+    private let stateMenuItem = NSMenuItem(title: "状態: 消灯中", action: nil, keyEquivalent: "")
     private let pauseMenuItem = NSMenuItem(title: "一時停止", action: #selector(pause), keyEquivalent: "")
     private let resumeMenuItem = NSMenuItem(title: "再開", action: #selector(resume), keyEquivalent: "")
     private var isPaused = false
@@ -61,11 +61,11 @@ final class StatusBarController: NSObject {
     }
 
     private func renderState() {
-        let title = isPaused ? "現在状態: 一時停止中" : "現在状態: \(currentState.rawValue)"
+        let title = isPaused ? "状態: 一時停止中" : "状態: \(currentState.displayName)"
         stateMenuItem.title = title
         pauseMenuItem.isEnabled = !isPaused
         resumeMenuItem.isEnabled = isPaused
-        statusItem.button?.toolTip = isPaused ? "LightWatch: 一時停止中" : "LightWatch: \(currentState.rawValue)"
+        statusItem.button?.toolTip = isPaused ? "LightWatch: 一時停止中" : "LightWatch: \(currentState.displayName)"
         setStatusIcon()
     }
 
