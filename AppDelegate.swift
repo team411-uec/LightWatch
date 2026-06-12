@@ -72,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         do {
             let snapshot = try analyzer.analyze(sampleBuffer: sampleBuffer, state: stateMachine.currentState)
+            logger.logSnapshot(snapshot)
 
             let transitionEvents = stateMachine.handle(snapshot: snapshot)
             DispatchQueue.main.async { [weak self] in
@@ -79,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             for event in transitionEvents {
+                logger.logEvent(event)
                 if let notification = event.notification {
                     send(notification)
                 }
