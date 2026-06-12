@@ -3,6 +3,7 @@ import Foundation
 final class DiscordWebhookClient {
     private let settingsProvider: () -> LightWatchSettings
     private let session: URLSession
+    private static let suppressNotificationsFlag = 1 << 12
 
     init(settingsProvider: @escaping () -> LightWatchSettings, session: URLSession = .shared) {
         self.settingsProvider = settingsProvider
@@ -19,9 +20,17 @@ final class DiscordWebhookClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: [
-            "content": notification.title
-        ])
+        let payload: [String: Any] = [
+            "content": notification.title,
+            "flags": Self.suppressNotificationsFlag
+        ]
+
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
+            completion(.failure(DiscordWebhookError.invalidPayload))
+            return
+        }
+
+        request.httpBody = body
 
         session.dataTask(with: request) { _, response, error in
             if let error {
@@ -40,12 +49,15 @@ final class DiscordWebhookClient {
 
 enum DiscordWebhookError: LocalizedError {
     case invalidURL
+    case invalidPayload
     case badStatus
 
     var errorDescription: String? {
         switch self {
         case .invalidURL:
             return "Discord Webhook URLが未設定またはHTTPSではありません。"
+        case .invalidPayload:
+            return "Discord Webhookに送信するJSONの作成に失敗しました。"
         case .badStatus:
             return "Discord Webhookが成功以外のHTTPステータスを返しました。"
         }
