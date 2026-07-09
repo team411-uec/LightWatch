@@ -6,23 +6,44 @@ VERSION="${1:-0.0.0}"
 APP_NAME="LightWatch"
 DIST_DIR="$ROOT_DIR/dist/macos"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
-DMG_STAGING_DIR="$(mktemp -d "${TMPDIR:-/tmp}/lightwatch-dmg.XXXXXX")"
+BUILD_DIR="$ROOT_DIR/build/macos"
+VENV_DIR="$BUILD_DIR/venv"
+TMP_ROOT="$BUILD_DIR/tmp"
 DMG_PATH="$ROOT_DIR/dist/LightWatch-macOS-$VERSION.dmg"
+
+if [[ -n "${PYTHON_BIN:-}" ]]; then
+  PYTHON="$PYTHON_BIN"
+elif command -v python3.11 >/dev/null 2>&1; then
+  PYTHON="python3.11"
+else
+  PYTHON="python3"
+fi
+
+rm -rf "$BUILD_DIR" "$DIST_DIR" "$DMG_PATH"
+mkdir -p "$DIST_DIR" "$TMP_ROOT"
+DMG_STAGING_DIR="$(mktemp -d "$TMP_ROOT/lightwatch-dmg.XXXXXX")"
 trap 'rm -rf "$DMG_STAGING_DIR"' EXIT
 
-rm -rf "$DIST_DIR" "$DMG_PATH"
-mkdir -p "$DIST_DIR"
-
-python3 -m pip install -e "$ROOT_DIR"
-python3 -m pip install pyinstaller
-python3 -m PyInstaller \
+"$PYTHON" -m venv "$VENV_DIR"
+"$VENV_DIR/bin/python" -m pip install --upgrade pip
+"$VENV_DIR/bin/python" -m pip install -e "$ROOT_DIR" pyinstaller
+"$VENV_DIR/bin/python" -m PyInstaller \
   --name "$APP_NAME" \
   --windowed \
   --osx-bundle-identifier "dev.akaaku.LightWatch" \
   --distpath "$DIST_DIR" \
-  --workpath "$ROOT_DIR/build/macos" \
-  --specpath "$ROOT_DIR/build/macos" \
+  --workpath "$BUILD_DIR/pyinstaller" \
+  --specpath "$BUILD_DIR" \
   "$ROOT_DIR/lightwatch/app.py"
+
+/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" "$APP_DIR/Contents/Info.plist" 2>/dev/null \
+  || /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_DIR/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $VERSION" "$APP_DIR/Contents/Info.plist" 2>/dev/null \
+  || /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$APP_DIR/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$APP_DIR/Contents/Info.plist" 2>/dev/null \
+  || /usr/libexec/PlistBuddy -c "Set :LSUIElement true" "$APP_DIR/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string Webカメラ映像の明るさ変化から部屋の使用状態の可能性を判定するために使用します。" "$APP_DIR/Contents/Info.plist" 2>/dev/null \
+  || /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription Webカメラ映像の明るさ変化から部屋の使用状態の可能性を判定するために使用します。" "$APP_DIR/Contents/Info.plist"
 
 if [[ -n "${MACOS_CODESIGN_IDENTITY:-}" ]]; then
   codesign --force --deep --options runtime --timestamp --sign "$MACOS_CODESIGN_IDENTITY" "$APP_DIR"

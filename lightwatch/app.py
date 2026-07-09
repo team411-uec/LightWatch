@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import threading
-
 import rumps
 
 from lightwatch.analyzer import LightAnalyzer
@@ -26,6 +24,7 @@ class LightWatchApp(rumps.App):
         self.webhookClient = DiscordWebhookClient(lambda: self.settings)
         self.powerAssertion = PowerAssertion()
         self.stateMenuItem = rumps.MenuItem("状態: 消灯中", callback=None)
+        self.settingsWindow = None
         self.cameraManager = CameraManager(
             self.settings.captureIntervalSec,
             self.settings.cameraUniqueID,
@@ -93,8 +92,8 @@ class LightWatchApp(rumps.App):
         open_path(self.settingsStore.logsDirectory)
 
     def open_settings(self, _sender) -> None:
-        window = SettingsWindow(self.settings, self.apply_settings)
-        threading.Thread(target=window.open, name="LightWatchSettings", daemon=True).start()
+        self.settingsWindow = SettingsWindow.create(self.settings, self.apply_settings)
+        self.settingsWindow.open()
 
     def apply_settings(self, updated_settings: LightWatchSettings) -> None:
         self.settings = updated_settings

@@ -20,6 +20,9 @@ dev = [
 [project.scripts]
 lightwatch = "lightwatch.app:main"
 
+[tool.setuptools.packages.find]
+include = ["lightwatch*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

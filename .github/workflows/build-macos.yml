@@ -1,0 +1,42 @@
+name: Build macOS App
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: |
+          ruff format --check lightwatch tests
+          ruff check lightwatch tests
+
+      - name: Test
+        run: pytest -q
+
+      - name: Build app
+        run: PYTHON_BIN=python installer/macos/build-app.sh 0.0.0
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: LightWatch-macOS
+          path: |
+            dist/macos/LightWatch.app
+            dist/LightWatch-macOS-0.0.0.dmg

@@ -1,111 +1,141 @@
 from __future__ import annotations
 
 import subprocess
-import tkinter as tk
 from collections.abc import Callable
-from tkinter import ttk
 
-from lightwatch.camera import CameraDeviceCatalog
+from AppKit import (
+    NSBackingStoreBuffered,
+    NSButton,
+    NSControlStateValueOff,
+    NSControlStateValueOn,
+    NSMakeRect,
+    NSTextField,
+    NSWindow,
+    NSWindowStyleMaskClosable,
+    NSWindowStyleMaskTitled,
+)
+from Foundation import NSObject
+
 from lightwatch.macos import set_launch_at_login
 from lightwatch.models import LightWatchSettings
 from lightwatch.settings import SettingsValidationError, apply_number_fields
 
 
-class SettingsWindow:
-    def __init__(
-        self, settings: LightWatchSettings, on_save: Callable[[LightWatchSettings], None]
-    ) -> None:
+class SettingsWindow(NSObject):
+    def initWithSettings_onSave_(self, settings, on_save):
+        self = super().init()
+        if self is None:
+            return None
         self.settings = settings
         self.on_save = on_save
-        self.window: tk.Tk | None = None
+        self.window = None
+        self.fields = {}
+        self.errorLabel = None
+        self.launchCheckbox = None
+        return self
+
+    @classmethod
+    def create(
+        cls, settings: LightWatchSettings, on_save: Callable[[LightWatchSettings], None]
+    ) -> SettingsWindow:
+        return cls.alloc().initWithSettings_onSave_(settings, on_save)
 
     def open(self) -> None:
-        if self.window is not None and self.window.winfo_exists():
-            self.window.lift()
+        if self.window is not None:
+            self.window.makeKeyAndOrderFront_(None)
             return
-        self.window = tk.Tk()
-        self.window.title("LightWatch設定")
-        self.window.geometry("700x520")
-        self.window.resizable(False, False)
+        self.window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+            NSMakeRect(0, 0, 700, 520),
+            NSWindowStyleMaskTitled | NSWindowStyleMaskClosable,
+            NSBackingStoreBuffered,
+            False,
+        )
+        self.window.setTitle_("LightWatch設定")
+        self.window.center()
+        content_view = self.window.contentView()
+        self._build_form(content_view)
+        self.window.makeKeyAndOrderFront_(None)
 
-        notebook = ttk.Notebook(self.window)
-        general_frame = ttk.Frame(notebook, padding=24)
-        detection_frame = ttk.Frame(notebook, padding=24)
-        notebook.add(general_frame, text="一般")
-        notebook.add(detection_frame, text="判定")
-        notebook.pack(fill="both", expand=True)
-
-        webhook_var = tk.StringVar(value=self.settings.discordWebhookURL)
-        camera_var = tk.StringVar(value=self.settings.cameraUniqueID)
-        launch_var = tk.BooleanVar(value=self.settings.launchAtLogin)
-        number_vars = {
-            "captureIntervalSec": tk.StringVar(value=str(int(self.settings.captureIntervalSec))),
-            "onConfirmSec": tk.StringVar(value=str(int(self.settings.onConfirmSec))),
-            "offConfirmSec": tk.StringVar(value=str(int(self.settings.offConfirmSec))),
-            "minDeltaOn": tk.StringVar(value=str(int(self.settings.minDeltaOn))),
-            "minDeltaOff": tk.StringVar(value=str(int(self.settings.minDeltaOff))),
-            "requiredPositiveROICount": tk.StringVar(
-                value=str(self.settings.requiredPositiveROICount)
+    def _build_form(self, content_view) -> None:
+        rows = [
+            ("Webhook URL", "discordWebhookURL", self.settings.discordWebhookURL),
+            ("カメラ番号", "cameraUniqueID", self.settings.cameraUniqueID),
+            ("取得間隔", "captureIntervalSec", str(int(self.settings.captureIntervalSec))),
+            ("ON確認", "onConfirmSec", str(int(self.settings.onConfirmSec))),
+            ("OFF確認", "offConfirmSec", str(int(self.settings.offConfirmSec))),
+            ("ON差分しきい値", "minDeltaOn", str(int(self.settings.minDeltaOn))),
+            ("OFF差分しきい値", "minDeltaOff", str(int(self.settings.minDeltaOff))),
+            (
+                "必要positive ROI数",
+                "requiredPositiveROICount",
+                str(self.settings.requiredPositiveROICount),
             ),
-        }
-        error_var = tk.StringVar(value="")
-
-        self._row(
-            general_frame,
-            "Webhook URL",
-            ttk.Entry(general_frame, textvariable=webhook_var, width=58),
-            0,
-        )
-        camera_box = ttk.Combobox(general_frame, textvariable=camera_var, width=28)
-        camera_box["values"] = [""] + [
-            option.id for option in CameraDeviceCatalog.available_options()
         ]
-        self._row(general_frame, "カメラ", camera_box, 1)
-        ttk.Checkbutton(general_frame, text="ログイン時に起動", variable=launch_var).grid(
-            row=2, column=1, sticky="w", pady=12
+        y = 456
+        for label_text, key, value in rows:
+            label = self._label(label_text, 24, y)
+            field = self._field(value, 180, y - 4, 440)
+            content_view.addSubview_(label)
+            content_view.addSubview_(field)
+            self.fields[key] = field
+            y -= 42
+
+        self.launchCheckbox = NSButton.alloc().initWithFrame_(NSMakeRect(180, y - 2, 220, 24))
+        self.launchCheckbox.setButtonType_(3)
+        self.launchCheckbox.setTitle_("ログイン時に起動")
+        self.launchCheckbox.setState_(
+            NSControlStateValueOn if self.settings.launchAtLogin else NSControlStateValueOff
         )
+        content_view.addSubview_(self.launchCheckbox)
 
-        labels = [
-            ("取得間隔", "captureIntervalSec", "秒"),
-            ("ON確認", "onConfirmSec", "秒"),
-            ("OFF確認", "offConfirmSec", "秒"),
-            ("ON差分しきい値", "minDeltaOn", ""),
-            ("OFF差分しきい値", "minDeltaOff", ""),
-            ("必要positive ROI数", "requiredPositiveROICount", ""),
-        ]
-        for row_index, (label, key, suffix) in enumerate(labels):
-            entry = ttk.Entry(detection_frame, textvariable=number_vars[key], width=12)
-            self._row(detection_frame, f"{label}{suffix}", entry, row_index)
+        self.errorLabel = self._label("", 24, 42)
+        content_view.addSubview_(self.errorLabel)
 
-        footer = ttk.Frame(self.window, padding=(24, 12))
-        footer.pack(fill="x")
-        ttk.Label(footer, textvariable=error_var, foreground="red").pack(side="left")
+        save_button = NSButton.alloc().initWithFrame_(NSMakeRect(580, 24, 88, 32))
+        save_button.setTitle_("保存")
+        save_button.setBezelStyle_(1)
+        save_button.setTarget_(self)
+        save_button.setAction_("save:")
+        content_view.addSubview_(save_button)
 
-        def save() -> None:
-            try:
-                updated_settings = apply_number_fields(
-                    LightWatchSettings(
-                        discordWebhookURL=webhook_var.get(),
-                        cameraUniqueID=camera_var.get(),
-                        launchAtLogin=launch_var.get(),
-                        rois=self.settings.rois,
-                    ),
-                    {key: value.get() for key, value in number_vars.items()},
-                )
-                set_launch_at_login(updated_settings.launchAtLogin)
-                self.settings = updated_settings
-                error_var.set("")
-                self.on_save(updated_settings)
-            except SettingsValidationError as error:
-                error_var.set(str(error))
-            except subprocess.CalledProcessError as error:
-                error_var.set(f"ログイン項目設定に失敗しました: {error}")
+    def _label(self, value: str, x: int, y: int):
+        label = NSTextField.alloc().initWithFrame_(NSMakeRect(x, y, 140, 24))
+        label.setStringValue_(value)
+        label.setEditable_(False)
+        label.setBordered_(False)
+        label.setDrawsBackground_(False)
+        return label
 
-        ttk.Button(footer, text="保存", command=save).pack(side="right")
-        self.window.mainloop()
+    def _field(self, value: str, x: int, y: int, width: int):
+        field = NSTextField.alloc().initWithFrame_(NSMakeRect(x, y, width, 28))
+        field.setStringValue_(value)
+        return field
 
-    def _row(self, parent: ttk.Frame, title: str, widget: ttk.Widget, row: int) -> None:
-        ttk.Label(parent, text=title, width=20, anchor="e").grid(
-            row=row, column=0, sticky="e", padx=(0, 16), pady=8
-        )
-        widget.grid(row=row, column=1, sticky="w", pady=8)
+    def save_(self, _sender) -> None:
+        try:
+            updated_settings = apply_number_fields(
+                LightWatchSettings(
+                    discordWebhookURL=self.fields["discordWebhookURL"].stringValue(),
+                    cameraUniqueID=self.fields["cameraUniqueID"].stringValue(),
+                    launchAtLogin=self.launchCheckbox.state() == NSControlStateValueOn,
+                    rois=self.settings.rois,
+                ),
+                {
+                    "captureIntervalSec": self.fields["captureIntervalSec"].stringValue(),
+                    "onConfirmSec": self.fields["onConfirmSec"].stringValue(),
+                    "offConfirmSec": self.fields["offConfirmSec"].stringValue(),
+                    "minDeltaOn": self.fields["minDeltaOn"].stringValue(),
+                    "minDeltaOff": self.fields["minDeltaOff"].stringValue(),
+                    "requiredPositiveROICount": self.fields[
+                        "requiredPositiveROICount"
+                    ].stringValue(),
+                },
+            )
+            set_launch_at_login(updated_settings.launchAtLogin)
+            self.settings = updated_settings
+            self.errorLabel.setStringValue_("")
+            self.on_save(updated_settings)
+        except SettingsValidationError as error:
+            self.errorLabel.setStringValue_(str(error))
+        except subprocess.CalledProcessError as error:
+            self.errorLabel.setStringValue_(f"ログイン項目設定に失敗しました: {error}")
