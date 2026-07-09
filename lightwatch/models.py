@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class LightWatchState(str, Enum):
+class LightWatchState(StrEnum):
     DARK = "DARK"
     ON_CANDIDATE = "ON_CANDIDATE"
     BRIGHT = "BRIGHT"
@@ -21,7 +21,7 @@ class LightWatchState(str, Enum):
         }[self]
 
 
-class ROIKind(str, Enum):
+class ROIKind(StrEnum):
     POSITIVE = "positive"
     NEGATIVE = "negative"
 
