@@ -1,14 +1,49 @@
 name: ci
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
   workflow_dispatch:
 
 jobs:
-  macos:
-    name: macOS
-    runs-on: macos-26
+  build-and-test:
+    name: Build and test (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS ARM64
+            os: macos-14
+          - name: Linux x64
+            os: ubuntu-24.04
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
 
-      - name: Build app bundle
-        run: ./installer/macos/build-app.sh 0.0.0-ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: |
+          ruff format --check lightwatch tests
+          ruff check lightwatch tests
+
+      - name: Test
+        run: pytest -q
+
+      - name: Build wheel
+        run: python -m build
+
+      - name: Verify wheel contents
+        shell: bash
+        run: |
+          python -m pip install --force-reinstall --no-deps dist/*.whl
+          python -c "from pathlib import Path; import lightwatch; assert (Path(lightwatch.__file__).parent / 'assets' / 'selfie_segmentation_landscape.tflite').is_file()"

@@ -6,19 +6,20 @@ requires-python = ">=3.11"
 dependencies = [
     "ai-edge-litert>=2.1.5,<3",
     "numpy>=1.26",
-    "opencv-python>=4.10",
+    "opencv-python-headless>=4.10",
     "requests>=2.32",
     "rumps>=0.4; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "build>=1.2",
     "pytest>=8.2",
     "ruff>=0.5",
 ]
 
 [project.scripts]
-lightwatch = "lightwatch.app:main"
+lightwatch = "lightwatch.main:main"
 
 [tool.setuptools.packages.find]
 include = ["lightwatch*"]

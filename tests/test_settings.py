@@ -1,7 +1,12 @@
+from pathlib import Path
+
+import pytest
+
 from lightwatch.models import LightWatchSettings, ROIKind
 from lightwatch.settings import (
     SettingsValidationError,
     apply_number_fields,
+    default_application_support_directory,
     settings_from_json,
     settings_to_json,
 )
@@ -46,3 +51,12 @@ def test_number_fields_reject_out_of_range_value() -> None:
         assert str(error) == "取得間隔は1から30の範囲で入力してください。"
     else:
         raise AssertionError("SettingsValidationErrorが発生しませんでした。")
+
+
+def test_linux_settings_use_xdg_data_home(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("lightwatch.settings.sys.platform", "linux")
+    monkeypatch.setenv("XDG_DATA_HOME", "/var/lib/lightwatch-test")
+
+    directory = default_application_support_directory()
+
+    assert directory == Path("/var/lib/lightwatch-test/LightWatch")

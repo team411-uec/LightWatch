@@ -82,9 +82,13 @@ class CameraManager:
             time.sleep(self.capture_interval)
 
     def _camera_index(self) -> int:
-        if self.camera_unique_id.strip() == "":
-            return 0
-        try:
-            return int(self.camera_unique_id)
-        except ValueError:
-            return 0
+        return camera_index(self.camera_unique_id)
+
+
+def camera_index(camera_unique_id: str) -> int:
+    if camera_unique_id.strip() == "":
+        return 0
+    try:
+        return int(camera_unique_id)
+    except ValueError:
+        return 0

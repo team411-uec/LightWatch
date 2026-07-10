@@ -13,7 +13,10 @@ from lightwatch.state_machine import StateMachine
 
 
 def make_snapshot(
-    timestamp: datetime, positive_median: float, state: LightWatchState
+    timestamp: datetime,
+    positive_median: float,
+    state: LightWatchState,
+    person_masked_ratio: float = 0,
 ) -> LightAnalysisSnapshot:
     bright_ratio = 0.1 if positive_median >= 135 else 0
     roi_stats = [
@@ -35,7 +38,7 @@ def make_snapshot(
         timestamp=timestamp,
         state=state,
         roiStats=roi_stats,
-        sceneLevel=LightSceneLevel.from_stats(roi_stats, PersonPresence(0)),
+        sceneLevel=LightSceneLevel.from_stats(roi_stats, PersonPresence(person_masked_ratio)),
     )
 
 
@@ -110,6 +113,38 @@ def test_exact_on_delta_is_not_absorbed_into_reference() -> None:
 
     assert state_machine.currentState == LightWatchState.ON_CANDIDATE
     assert events[0].event == "on_candidate"
+
+
+def test_exact_off_delta_is_not_absorbed_into_reference() -> None:
+    settings = LightWatchSettings.default()
+    state_machine = StateMachine(settings, LightWatchState.BRIGHT)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    state_machine.handle(make_snapshot(start, 148, LightWatchState.BRIGHT))
+
+    events = state_machine.handle(
+        make_snapshot(start + timedelta(seconds=1), 130, LightWatchState.BRIGHT)
+    )
+
+    assert state_machine.currentState == LightWatchState.OFF_CANDIDATE
+    assert events[0].event == "off_candidate"
+
+
+def test_person_presence_prevents_off_candidate() -> None:
+    state_machine = StateMachine(LightWatchSettings.default(), LightWatchState.BRIGHT)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    state_machine.handle(make_snapshot(start, 150, LightWatchState.BRIGHT))
+
+    events = state_machine.handle(
+        make_snapshot(
+            start + timedelta(seconds=1),
+            90,
+            LightWatchState.BRIGHT,
+            person_masked_ratio=0.02,
+        )
+    )
+
+    assert events == []
+    assert state_machine.currentState == LightWatchState.BRIGHT
 
 
 def test_does_not_confirm_on_across_frame_gap() -> None:

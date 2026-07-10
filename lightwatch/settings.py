@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from dataclasses import asdict
 from pathlib import Path
 
@@ -12,9 +14,9 @@ class SettingsValidationError(ValueError):
 
 
 class SettingsStore:
-    def __init__(self) -> None:
+    def __init__(self, application_support_directory: Path | None = None) -> None:
         self.applicationSupportDirectory = (
-            Path.home() / "Library" / "Application Support" / "LightWatch"
+            application_support_directory or default_application_support_directory()
         )
         self.logsDirectory = self.applicationSupportDirectory / "logs"
         self.configPath = self.applicationSupportDirectory / "config.json"
@@ -42,6 +44,17 @@ class SettingsStore:
     def ensure_directories(self) -> None:
         self.applicationSupportDirectory.mkdir(parents=True, exist_ok=True)
         self.logsDirectory.mkdir(parents=True, exist_ok=True)
+
+
+def default_application_support_directory() -> Path:
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "LightWatch"
+    if sys.platform.startswith("linux"):
+        data_home = os.environ.get("XDG_DATA_HOME")
+        return (
+            Path(data_home).expanduser() if data_home else Path.home() / ".local" / "share"
+        ) / "LightWatch"
+    raise RuntimeError(f"未対応のOSです: {sys.platform}")
 
 
 def settings_from_json(raw_settings: dict[str, object]) -> LightWatchSettings:
