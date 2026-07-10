@@ -3,4 +3,4 @@ set -euo pipefail
 
 uv run --python 3.11 --with ruff --no-project ruff format --check lightwatch tests
 uv run --python 3.11 --with ruff --no-project ruff check lightwatch tests
-PYTHONPATH=. uv run --python 3.11 --with pytest --no-project pytest -q
+uv run --python 3.11 --with-editable . --with pytest --no-project pytest -q

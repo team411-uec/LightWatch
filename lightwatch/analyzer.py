@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import cv2
-import mediapipe as mp
 import numpy as np
 
 from lightwatch.models import (
@@ -14,12 +12,15 @@ from lightwatch.models import (
     PersonPresence,
     ROIStats,
 )
+from lightwatch.person_segmenter import LiteRTPersonSegmenter, PersonSegmenter
 
 
 class LightAnalyzer:
-    def __init__(self, rois: list[LightROI]) -> None:
+    def __init__(
+        self, rois: list[LightROI], person_segmenter: PersonSegmenter | None = None
+    ) -> None:
         self.rois = rois
-        self.segmenter = mp.solutions.selfie_segmentation.SelfieSegmentation(model_selection=1)
+        self.personSegmenter = person_segmenter or LiteRTPersonSegmenter()
         self.brightThreshold = 180
         self.darkThreshold = 50
         self.personMaskThreshold = 0.5
@@ -37,9 +38,7 @@ class LightAnalyzer:
         )
 
     def make_person_mask(self, frame: np.ndarray) -> np.ndarray:
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        result = self.segmenter.process(rgb_frame)
-        return np.asarray(result.segmentation_mask, dtype=np.float32)
+        return self.personSegmenter.make_mask(frame)
 
     def analyze_person_presence(self, person_mask: np.ndarray) -> PersonPresence:
         height, width = person_mask.shape[:2]

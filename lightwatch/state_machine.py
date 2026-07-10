@@ -40,9 +40,9 @@ class StateMachine:
     def handle_dark(self, snapshot: LightAnalysisSnapshot) -> list[LightEvent]:
         if not self.is_observable(snapshot):
             return []
-        self.update_stable_reference(snapshot)
         signal = self.evaluate_signal(snapshot)
         if not signal.onEvidence:
+            self.update_stable_reference(snapshot)
             return []
         return self.start_on_candidate(snapshot, signal)
 
@@ -75,8 +75,8 @@ class StateMachine:
             return []
         if not self.is_observable(snapshot):
             return []
-        self.update_stable_reference(snapshot)
         if not signal.offEvidence:
+            self.update_stable_reference(snapshot)
             return []
         return self.start_off_candidate(snapshot, signal)
 
@@ -214,6 +214,7 @@ class StateMachine:
             snapshot.sceneLevel.positiveMedian <= 130
             and snapshot.sceneLevel.positiveBrightRatio <= 0.02
         )
+        bootstrap_on = reference is None and absolute_on
         guard_moved_on = guard_delta is not None and guard_delta >= self.settings.minDeltaOn
         guard_moved_off = guard_delta is not None and guard_delta <= self.settings.minDeltaOff
         positive_move_is_strong_on = (
@@ -232,7 +233,7 @@ class StateMachine:
         )
         light_on_evidence = (
             self.is_observable(snapshot)
-            and (positive_on_count >= required_count or aggregate_on)
+            and (positive_on_count >= required_count or aggregate_on or bootstrap_on)
             and absolute_on
             and not reject_weak_global_on_shift
         )
@@ -265,6 +266,7 @@ class StateMachine:
             "light_on_evidence": 1 if light_on_evidence else 0,
             "person_backed_on_evidence": 1 if person_backed_on_evidence else 0,
             "light_off_evidence": 1 if light_off_evidence else 0,
+            "bootstrap_on_evidence": 1 if bootstrap_on else 0,
             "reject_weak_global_on_shift": 1 if reject_weak_global_on_shift else 0,
             "reject_weak_global_off_shift": 1 if reject_weak_global_off_shift else 0,
         }
@@ -312,6 +314,14 @@ class StateMachine:
         off_ratio = sum(sample.offEvidence for sample in relevant_samples) / total
         weak_person_ratio = sum(sample.weakPersonPresent for sample in relevant_samples) / total
         strong_person_ratio = sum(sample.strongPersonPresent for sample in relevant_samples) / total
+        maximum_sample_gap = max(
+            (
+                (current.timestamp - previous.timestamp).total_seconds()
+                for previous, current in zip(relevant_samples, relevant_samples[1:], strict=False)
+            ),
+            default=0,
+        )
+        samples_are_continuous = maximum_sample_gap <= max(3, self.settings.captureIntervalSec * 3)
         enough_time = elapsed >= confirm_sec
         enough_samples = total >= 3
         cancel_grace_sec = min(45, max(15, confirm_sec / 4))
@@ -323,9 +333,15 @@ class StateMachine:
             off_ratio,
             weak_person_ratio,
             strong_person_ratio,
-            enough_time and enough_samples and on_ratio >= 0.80 and off_ratio <= 0.10,
+            maximum_sample_gap,
             enough_time
             and enough_samples
+            and samples_are_continuous
+            and on_ratio >= 0.80
+            and off_ratio <= 0.10,
+            enough_time
+            and enough_samples
+            and samples_are_continuous
             and off_ratio >= 0.80
             and on_ratio <= 0.15
             and weak_person_ratio <= 0.05,
@@ -457,6 +473,7 @@ class CandidateAssessment:
     offRatio: float
     weakPersonRatio: float
     strongPersonRatio: float
+    maximumSampleGap: float
     shouldConfirmOn: bool
     shouldConfirmOff: bool
     shouldCancelOn: bool
@@ -464,7 +481,7 @@ class CandidateAssessment:
 
     @classmethod
     def empty(cls) -> CandidateAssessment:
-        return cls(0, 0, 0, 0, 0, 0, False, False, False, False)
+        return cls(0, 0, 0, 0, 0, 0, 0, False, False, False, False)
 
     @property
     def values(self) -> dict[str, float]:
@@ -475,6 +492,7 @@ class CandidateAssessment:
             "candidate_off_ratio": self.offRatio,
             "candidate_weak_person_ratio": self.weakPersonRatio,
             "candidate_strong_person_ratio": self.strongPersonRatio,
+            "candidate_maximum_sample_gap_sec": self.maximumSampleGap,
         }
 
 

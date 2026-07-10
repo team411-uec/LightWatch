@@ -4,11 +4,11 @@ version = "0.0.0"
 description = "macOS menu bar app that watches camera light changes and sends Discord notifications."
 requires-python = ">=3.11"
 dependencies = [
-    "mediapipe>=0.10.14",
+    "ai-edge-litert>=2.1.5,<3",
     "numpy>=1.26",
     "opencv-python>=4.10",
     "requests>=2.32",
-    "rumps>=0.4",
+    "rumps>=0.4; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]
@@ -22,6 +22,9 @@ lightwatch = "lightwatch.app:main"
 
 [tool.setuptools.packages.find]
 include = ["lightwatch*"]
+
+[tool.setuptools.package-data]
+lightwatch = ["assets/*.tflite"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

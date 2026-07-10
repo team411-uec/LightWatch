@@ -51,15 +51,11 @@ def test_confirms_on_after_continuous_on_evidence() -> None:
     )
     assert first_events[0].event == "on_candidate"
 
-    state_machine.handle(
-        make_snapshot(start + timedelta(seconds=5), 152, LightWatchState.ON_CANDIDATE)
-    )
-    state_machine.handle(
-        make_snapshot(start + timedelta(seconds=8), 153, LightWatchState.ON_CANDIDATE)
-    )
-    final_events = state_machine.handle(
-        make_snapshot(start + timedelta(seconds=12), 154, LightWatchState.ON_CANDIDATE)
-    )
+    final_events = []
+    for second in range(2, 12):
+        final_events = state_machine.handle(
+            make_snapshot(start + timedelta(seconds=second), 152, LightWatchState.ON_CANDIDATE)
+        )
 
     assert state_machine.currentState == LightWatchState.BRIGHT
     assert final_events[0].event == "notify_on"
@@ -79,17 +75,60 @@ def test_confirms_off_after_continuous_off_evidence() -> None:
     )
     assert first_events[0].event == "off_candidate"
 
-    state_machine.handle(
-        make_snapshot(start + timedelta(seconds=5), 88, LightWatchState.OFF_CANDIDATE)
-    )
-    state_machine.handle(
-        make_snapshot(start + timedelta(seconds=8), 87, LightWatchState.OFF_CANDIDATE)
-    )
-    final_events = state_machine.handle(
-        make_snapshot(start + timedelta(seconds=12), 86, LightWatchState.OFF_CANDIDATE)
-    )
+    final_events = []
+    for second in range(2, 12):
+        final_events = state_machine.handle(
+            make_snapshot(start + timedelta(seconds=second), 88, LightWatchState.OFF_CANDIDATE)
+        )
 
     assert state_machine.currentState == LightWatchState.DARK
     assert final_events[0].event == "notify_off"
     assert final_events[0].notification is not None
     assert final_events[0].notification.title == "⚪人がいません"
+
+
+def test_bright_scene_at_start_is_not_missed() -> None:
+    state_machine = StateMachine(LightWatchSettings.default(), LightWatchState.DARK)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+
+    events = state_machine.handle(make_snapshot(start, 150, LightWatchState.DARK))
+
+    assert state_machine.currentState == LightWatchState.ON_CANDIDATE
+    assert events[0].event == "on_candidate"
+    assert events[0].values["bootstrap_on_evidence"] == 1
+
+
+def test_exact_on_delta_is_not_absorbed_into_reference() -> None:
+    settings = LightWatchSettings.default()
+    state_machine = StateMachine(settings, LightWatchState.DARK)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    state_machine.handle(make_snapshot(start, 130, LightWatchState.DARK))
+
+    events = state_machine.handle(
+        make_snapshot(start + timedelta(seconds=1), 148, LightWatchState.DARK)
+    )
+
+    assert state_machine.currentState == LightWatchState.ON_CANDIDATE
+    assert events[0].event == "on_candidate"
+
+
+def test_does_not_confirm_on_across_frame_gap() -> None:
+    settings = LightWatchSettings.default()
+    settings.onConfirmSec = 10
+    state_machine = StateMachine(settings, LightWatchState.DARK)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    state_machine.handle(make_snapshot(start, 90, LightWatchState.DARK))
+    state_machine.handle(make_snapshot(start + timedelta(seconds=1), 150, LightWatchState.DARK))
+    state_machine.handle(
+        make_snapshot(start + timedelta(seconds=2), 150, LightWatchState.ON_CANDIDATE)
+    )
+    state_machine.handle(
+        make_snapshot(start + timedelta(seconds=3), 150, LightWatchState.ON_CANDIDATE)
+    )
+
+    events = state_machine.handle(
+        make_snapshot(start + timedelta(seconds=11), 150, LightWatchState.ON_CANDIDATE)
+    )
+
+    assert events == []
+    assert state_machine.currentState == LightWatchState.ON_CANDIDATE
