@@ -60,16 +60,15 @@ def set_launch_at_login(
         raise RuntimeError("配布済みのLightWatch.appから設定してください。")
 
     plist_path = launch_agent_path(home_directory or Path.home())
-    domain = f"gui/{user_id if user_id is not None else os.getuid()}"
-    subprocess.run(["launchctl", "bootout", domain, str(plist_path)], check=False)
     if not enabled:
+        domain = f"gui/{user_id if user_id is not None else os.getuid()}"
+        subprocess.run(["launchctl", "bootout", domain, str(plist_path)], check=False)
         plist_path.unlink(missing_ok=True)
         return
 
     plist_path.parent.mkdir(parents=True, exist_ok=True)
     with plist_path.open("wb") as file:
         plistlib.dump(launch_agent_contents(current_executable), file)
-    subprocess.run(["launchctl", "bootstrap", domain, str(plist_path)], check=True)
 
 
 def open_path(path: Path) -> None:

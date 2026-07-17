@@ -41,7 +41,7 @@ def test_set_launch_at_login_rejects_non_app_executable() -> None:
         set_launch_at_login(True, executable=Path("/usr/local/bin/lightwatch"))
 
 
-def test_set_launch_at_login_writes_and_loads_launch_agent(
+def test_set_launch_at_login_writes_launch_agent_for_next_login(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     commands: list[list[str]] = []
@@ -56,7 +56,4 @@ def test_set_launch_at_login_writes_and_loads_launch_agent(
     plist_path = launch_agent_path(tmp_path)
     with plist_path.open("rb") as file:
         assert plistlib.load(file) == launch_agent_contents(executable)
-    assert commands == [
-        ["launchctl", "bootout", "gui/501", str(plist_path)],
-        ["launchctl", "bootstrap", "gui/501", str(plist_path)],
-    ]
+    assert commands == []
