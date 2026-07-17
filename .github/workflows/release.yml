@@ -52,4 +52,5 @@ jobs:
           gh release upload
           "v${{ steps.version.outputs.value }}"
           "dist/LightWatch-macOS-${{ steps.version.outputs.value }}.dmg"
+          "dist/LightWatch-macOS-${{ steps.version.outputs.value }}.zip"
           --clobber

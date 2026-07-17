@@ -10,6 +10,7 @@ BUILD_DIR="$ROOT_DIR/build/macos"
 VENV_DIR="$BUILD_DIR/venv"
 TMP_ROOT="$BUILD_DIR/tmp"
 DMG_PATH="$ROOT_DIR/dist/LightWatch-macOS-$VERSION.dmg"
+ZIP_PATH="$ROOT_DIR/dist/LightWatch-macOS-$VERSION.zip"
 
 if [[ -n "${PYTHON_BIN:-}" ]]; then
   PYTHON="$PYTHON_BIN"
@@ -19,7 +20,7 @@ else
   PYTHON="python3"
 fi
 
-rm -rf "$BUILD_DIR" "$DIST_DIR" "$DMG_PATH"
+rm -rf "$BUILD_DIR" "$DIST_DIR" "$DMG_PATH" "$ZIP_PATH"
 mkdir -p "$DIST_DIR" "$TMP_ROOT"
 DMG_STAGING_DIR="$(mktemp -d "$TMP_ROOT/lightwatch-dmg.XXXXXX")"
 trap 'rm -rf "$DMG_STAGING_DIR"' EXIT
@@ -57,4 +58,6 @@ mkdir -p "$DMG_STAGING_DIR"
 cp -R "$APP_DIR" "$DMG_STAGING_DIR/"
 ln -s /Applications "$DMG_STAGING_DIR/Applications"
 hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_STAGING_DIR" -ov -format UDZO "$DMG_PATH"
+ditto -c -k --keepParent "$APP_DIR" "$ZIP_PATH"
 echo "$DMG_PATH"
+echo "$ZIP_PATH"

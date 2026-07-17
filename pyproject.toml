@@ -1,6 +1,6 @@
 [project]
 name = "lightwatch"
-version = "0.0.0"
+version = "0.1.1"
 description = "macOS menu bar app that watches camera light changes and sends Discord notifications."
 requires-python = ">=3.11"
 dependencies = [
