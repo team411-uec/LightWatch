@@ -82,7 +82,7 @@ class SettingsWindow(NSObject):
 
         self.launchCheckbox = NSButton.alloc().initWithFrame_(NSMakeRect(180, y - 2, 220, 24))
         self.launchCheckbox.setButtonType_(3)
-        self.launchCheckbox.setTitle_("ログイン時に起動")
+        self.launchCheckbox.setTitle_("ログイン時に常駐")
         self.launchCheckbox.setState_(
             NSControlStateValueOn if self.settings.launchAtLogin else NSControlStateValueOff
         )
@@ -137,5 +137,5 @@ class SettingsWindow(NSObject):
             self.on_save(updated_settings)
         except SettingsValidationError as error:
             self.errorLabel.setStringValue_(str(error))
-        except subprocess.CalledProcessError as error:
-            self.errorLabel.setStringValue_(f"ログイン項目設定に失敗しました: {error}")
+        except (RuntimeError, subprocess.CalledProcessError) as error:
+            self.errorLabel.setStringValue_(f"常駐設定に失敗しました: {error}")
