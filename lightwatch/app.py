@@ -7,7 +7,7 @@ from lightwatch.macos import PowerAssertion, open_path
 from lightwatch.models import LightWatchSettings
 from lightwatch.processor import FrameProcessor
 from lightwatch.settings import SettingsStore
-from lightwatch.settings_window import SettingsWindow
+from lightwatch.settings_window import create_settings_window
 
 
 class LightWatchApp(rumps.App):
@@ -75,7 +75,7 @@ class LightWatchApp(rumps.App):
         open_path(self.settingsStore.logsDirectory)
 
     def open_settings(self, _sender) -> None:
-        self.settingsWindow = SettingsWindow.create(self.settings, self.apply_settings)
+        self.settingsWindow = create_settings_window(self.settings, self.apply_settings)
         self.settingsWindow.open()
 
     def apply_settings(self, updated_settings: LightWatchSettings) -> None:

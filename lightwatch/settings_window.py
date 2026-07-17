@@ -15,6 +15,8 @@ from AppKit import (
     NSWindowStyleMaskTitled,
 )
 from Foundation import NSObject
+from objc import python_method
+from objc import super as objc_super
 
 from lightwatch.macos import set_launch_at_login
 from lightwatch.models import LightWatchSettings
@@ -23,7 +25,7 @@ from lightwatch.settings import SettingsValidationError, apply_number_fields
 
 class SettingsWindow(NSObject):
     def initWithSettings_onSave_(self, settings, on_save):
-        self = super().init()
+        self = objc_super(SettingsWindow, self).init()
         if self is None:
             return None
         self.settings = settings
@@ -34,12 +36,7 @@ class SettingsWindow(NSObject):
         self.launchCheckbox = None
         return self
 
-    @classmethod
-    def create(
-        cls, settings: LightWatchSettings, on_save: Callable[[LightWatchSettings], None]
-    ) -> SettingsWindow:
-        return cls.alloc().initWithSettings_onSave_(settings, on_save)
-
+    @python_method
     def open(self) -> None:
         if self.window is not None:
             self.window.makeKeyAndOrderFront_(None)
@@ -56,6 +53,7 @@ class SettingsWindow(NSObject):
         self._build_form(content_view)
         self.window.makeKeyAndOrderFront_(None)
 
+    @python_method
     def _build_form(self, content_view) -> None:
         rows = [
             ("Webhook URL", "discordWebhookURL", self.settings.discordWebhookURL),
@@ -98,6 +96,7 @@ class SettingsWindow(NSObject):
         save_button.setAction_("save:")
         content_view.addSubview_(save_button)
 
+    @python_method
     def _label(self, value: str, x: int, y: int):
         label = NSTextField.alloc().initWithFrame_(NSMakeRect(x, y, 140, 24))
         label.setStringValue_(value)
@@ -106,6 +105,7 @@ class SettingsWindow(NSObject):
         label.setDrawsBackground_(False)
         return label
 
+    @python_method
     def _field(self, value: str, x: int, y: int, width: int):
         field = NSTextField.alloc().initWithFrame_(NSMakeRect(x, y, width, 28))
         field.setStringValue_(value)
@@ -139,3 +139,9 @@ class SettingsWindow(NSObject):
             self.errorLabel.setStringValue_(str(error))
         except (RuntimeError, subprocess.CalledProcessError) as error:
             self.errorLabel.setStringValue_(f"常駐設定に失敗しました: {error}")
+
+
+def create_settings_window(
+    settings: LightWatchSettings, on_save: Callable[[LightWatchSettings], None]
+) -> SettingsWindow:
+    return SettingsWindow.alloc().initWithSettings_onSave_(settings, on_save)

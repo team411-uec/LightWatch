@@ -12,6 +12,12 @@ from lightwatch.macos import (
 )
 
 
+def test_macos_app_module_imports() -> None:
+    from lightwatch.app import LightWatchApp
+
+    assert LightWatchApp.__name__ == "LightWatchApp"
+
+
 def test_application_bundle_path_returns_containing_app() -> None:
     executable = Path("/Applications/LightWatch.app/Contents/MacOS/LightWatch")
 

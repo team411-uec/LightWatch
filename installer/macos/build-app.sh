@@ -37,7 +37,7 @@ trap 'rm -rf "$DMG_STAGING_DIR"' EXIT
   --specpath "$BUILD_DIR" \
   --add-data "$ROOT_DIR/lightwatch/assets/selfie_segmentation_landscape.tflite:lightwatch/assets" \
   --hidden-import "ai_edge_litert._pywrap_litert_interpreter_wrapper" \
-  "$ROOT_DIR/lightwatch/app.py"
+  "$ROOT_DIR/lightwatch/main.py"
 
 /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" "$APP_DIR/Contents/Info.plist" 2>/dev/null \
   || /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_DIR/Contents/Info.plist"

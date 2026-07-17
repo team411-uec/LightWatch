@@ -90,6 +90,12 @@ Linuxでは次の場所に保存されます。`XDG_DATA_HOME`が設定されて
 pgrep -fl LightWatch
 ```
 
+CLIから起動する場合は、展開したアプリを`/Applications`へ移動してから次を実行します。
+
+```sh
+/Applications/LightWatch.app/Contents/MacOS/LightWatch
+```
+
 初回起動後に`config.json`が作成されていれば、設定保存先は動作しています。
 
 ## ログ
@@ -105,3 +111,9 @@ pgrep -fl LightWatch
 Linuxのログは`~/.local/share/LightWatch/logs/`へ保存します。`XDG_DATA_HOME`が設定されている場合は、設定ファイルと同じ`LightWatch`ディレクトリ内の`logs/`へ保存します。
 
 Webhook URLが未設定の場合、通知は送信されず、`errors.log`に記録されます。
+
+起動直後に終了した場合は、次のコマンドで起動失敗の詳細を確認できます。
+
+```sh
+tail -n 100 "$HOME/Library/Application Support/LightWatch/logs/errors.log"
+```
